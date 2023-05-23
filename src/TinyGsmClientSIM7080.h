@@ -40,6 +40,13 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       init(&modem, mux);
     }
 
+// <MS>
+    ~GsmClientSim7080() {
+//      DBG("<MS> ~GsmClientSim7080 mux: ", mux);
+      at->sockets[this->mux] = NULL;
+    }
+// <MS>
+
     bool init(TinyGsmSim7080* modem, uint8_t mux = 0) {
       this->at       = modem;
       sock_available = 0;
@@ -52,10 +59,17 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       } else {
         this->mux = (mux % TINY_GSM_MUX_COUNT);
       }
-      at->sockets[this->mux] = this;
 
-      return true;
+// <MS>      
+      if (at->sockets[this->mux] == NULL) {
+        at->sockets[this->mux] = this;
+        return true;
+      } else {
+        DBG("<MS> init ERROR.");
+        return false;
+      }
     }
+// <MS>
 
    public:
     virtual int connect(const char* host, uint16_t port, int timeout_s) {
@@ -148,7 +162,10 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     if (waitResponse(10000L) != 1) { return false; }
 
     // Enable battery checks
-    sendAT(GF("+CBATCHK=1"));
+// <MS>
+//    sendAT(GF("+CBATCHK=1"));
+    sendAT(GF("+CBATCHK=0"));
+// <MS>
     if (waitResponse() != 1) { return false; }
 
     SimStatus ret = getSimStatus();
@@ -176,7 +193,13 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
     // modemGetAvailable checks all socks, so we only want to do it once
     // modemGetAvailable calls modemGetConnected(), which also checks allf
-    if (check_socks) { modemGetAvailable(0); }
+
+// <MS>
+//    if (check_socks) { modemGetAvailable(0); }
+    // Check all mux in use (-1).
+    if (check_socks) { modemGetAvailable((uint8_t)-1); }
+// <MS>
+
     while (stream.available()) { waitResponse(15, NULL, NULL); }
   }
 
@@ -331,6 +354,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
  protected:
   bool modemConnect(const char* host, uint16_t port, uint8_t mux,
                     bool ssl = false, int timeout_s = 75) {
+    DBG("<MS> modemConnect (#", mux, ") >> host: ", host, ", port: ", port, ", ssl: ", ssl, ", timeout: ", timeout_s);
+
     uint32_t timeout_ms = ((uint32_t)timeout_s) * 1000;
 
     // set the connection (mux) identifier to use
@@ -349,7 +374,10 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       //              4: QAPI_NET_SSL_PROTOCOL_DTLS_1_0
       //              5: QAPI_NET_SSL_PROTOCOL_DTLS_1_2
       // NOTE:  despite docs using caps, "sslversion" must be in lower case
-      sendAT(GF("+CSSLCFG=\"sslversion\",0,3"));  // TLS 1.2
+// <MS>
+//      sendAT(GF("+CSSLCFG=\"sslversion\",0,3"));  // TLS 1.2
+      sendAT(GF("+CSSLCFG=\"sslversion\","), mux, GF(",3"));  // TLS 1.2
+// <MS>      
       if (waitResponse(5000L) != 1) return false;
     }
 
@@ -362,12 +390,20 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     waitResponse();
 
     if (ssl) {
+// <MS> NEW
+      sendAT(GF("+CASSLCFG="), mux, ',', GF("crindex,"), mux);
+      waitResponse();
+// <MS>
+
       // set the PDP context to apply SSL to
       // AT+CSSLCFG="CTXINDEX",<ctxindex>
       // <ctxindex> PDP context identifier
       // NOTE:  despite docs using "CRINDEX" in all caps, the module only
       // accepts the command "ctxindex" and it must be in lower case
-      sendAT(GF("+CSSLCFG=\"ctxindex\",0"));
+// <MS>      
+//      sendAT(GF("+CSSLCFG=\"ctxindex\",0"));
+      sendAT(GF("+CSSLCFG=\"ctxindex\","), mux);
+// <MS>      
       if (waitResponse(5000L, GF("+CSSLCFG:")) != 1) return false;
       streamSkipUntil('\n');  // read out the certificate information
       waitResponse();
@@ -425,6 +461,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     int8_t res = streamGetIntBefore('\n');
     waitResponse();
 
+    DBG("<MS> modemConnect (#", mux, ") << return: ", res==0, " (res: ", res, ")");
+
     return 0 == res;
   }
 
@@ -465,6 +503,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     // characters available, but in tests only the number is returned
 
     int16_t len_confirmed = stream.parseInt();
+    DBG("<MS> modemRead(#", mux, ") len_confirmed: ", len_confirmed);
     streamSkipUntil(',');  // skip the comma
     if (len_confirmed <= 0) {
       waitResponse();
@@ -489,7 +528,13 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
   size_t modemGetAvailable(uint8_t mux) {
     // If the socket doesn't exist, just return
-    if (!sockets[mux]) { return 0; }
+
+// <MS>
+//    if (!sockets[mux]) { return 0; }
+    // If a mux is given (i.e. mux != -1) check only if this mux is in use. 
+    if ((mux != (uint8_t)-1) && (!sockets[mux])) { return 0; }
+// <MS>
+
     // NOTE: This gets how many characters are available on all connections that
     // have data.  It does not return all the connections, just those with data.
     sendAT(GF("+CARECV?"));
@@ -523,6 +568,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         break;
       } else {
         // if we got an error, give up
+        DBG("<MS> modemGetAvailable ERROR.");
         break;
       }
       // Should be a final OK at the end.
@@ -573,6 +619,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         break;
       } else {
         // if we got an error, give up
+        DBG("<MS> modemGetConnected ERROR.");
         break;
       }
       // Should be a final OK at the end.
@@ -639,7 +686,15 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
           int16_t len = streamGetIntBefore('\n');
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->got_data = true;
+// <MS>            
             if (len >= 0 && len <= 1024) { sockets[mux]->sock_available = len; }
+/*            
+            if (len >= 0) { sockets[mux]->sock_available = len; }
+            if ((len < 0) || (len > TINY_GSM_RX_BUFFER)) {
+              DBG("<MS> waitResponse WARN len out of range: ", len);
+            }
+*/            
+// <MS>            
           }
           data = "";
           DBG("### Got Data:", len, "on", mux);
