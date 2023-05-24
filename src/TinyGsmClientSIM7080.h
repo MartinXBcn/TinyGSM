@@ -529,10 +529,16 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
   size_t modemGetAvailable(uint8_t mux) {
     // If the socket doesn't exist, just return
 
+    DBG("<MS> modemGetAvailable >> mux: ", mux);
+
 // <MS>
 //    if (!sockets[mux]) { return 0; }
     // If a mux is given (i.e. mux != -1) check only if this mux is in use. 
-    if ((mux != (uint8_t)-1) && (!sockets[mux])) { return 0; }
+    if ((mux != (uint8_t)-1) && (!sockets[mux])) { 
+      return 0; 
+    }
+
+    size_t result_sum = 0;
 // <MS>
 
     // NOTE: This gets how many characters are available on all connections that
@@ -546,6 +552,13 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       if (res == 1) {
         int               ret_mux = streamGetIntBefore(',');
         size_t            result  = streamGetIntBefore('\n');
+
+// <MS>        
+        result_sum += result;
+// <MS>        
+
+        DBG("<MS> modemGetAvailable ret_mux: ", ret_mux, ", available: ", result);
+
         GsmClientSim7080* sock    = sockets[ret_mux];
         if (sock) { sock->sock_available = result; }
         // if the first returned mux isn't 0 (or is higher than expected)
@@ -577,7 +590,18 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       if (muxNo == TINY_GSM_MUX_COUNT - 1) { waitResponse(); }
     }
     modemGetConnected(mux);  // check the state of all connections
-    if (!sockets[mux]) { return 0; }
+// <MS>
+    if (mux == (uint8_t)-1) {
+      // No specific mux given, all active muxs updated, no specific return-value expected by caller.
+      DBG("<MS> modemGetAvailable (#", mux, ") << return: ", result_sum);
+      // If there was at least one mux with available return > 0.
+      return result_sum;
+    }
+// <MS>
+    if (!sockets[mux]) { 
+      DBG("<MS> modemGetAvailable (#", mux, ") << ERROR (sockets[mux] is null) return: 0");
+      return 0; }
+    DBG("<MS> modemGetAvailable (#", mux, ") << return: ", sockets[mux]->sock_available);
     return sockets[mux]->sock_available;
   }
 
@@ -585,6 +609,10 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     // NOTE:  This gets the state of all connections that have been opened
     // since the last connection
     sendAT(GF("+CASTATE?"));
+
+// <MS>
+    bool connected_sum = false;
+// <MS>        
 
     for (int muxNo = 0; muxNo < TINY_GSM_MUX_COUNT; muxNo++) {
       // after the last connection, there's an ok, so we catch it right away
@@ -598,7 +626,11 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         // 1: Connected to remote server
         // 2: Listening (server mode)
         GsmClientSim7080* sock = sockets[ret_mux];
-        if (sock) { sock->sock_connected = (status == 1); }
+        if (sock) { 
+          sock->sock_connected = (status == 1); 
+// <MS>
+          connected_sum = connected_sum | sock->sock_connected;
+        }
         // if the first returned mux isn't 0 (or is higher than expected)
         // we need to fill in the missing muxes
         if (ret_mux > muxNo) {
@@ -627,6 +659,15 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       // If only a portion were returned, catch it above.
       if (muxNo == TINY_GSM_MUX_COUNT - 1) { waitResponse(); }
     }
+// <MS>    
+    if (mux == (uint8_t)-1) {
+      // No specific mux given, all active muxs updated, no specific return-value expected by caller.
+      DBG("<MS> modemGetConnected (#", mux, ") return: ", connected_sum ? "true" : "false");
+      return connected_sum;
+    }
+
+    DBG("<MS> modemGetConnected (#", mux, ") return: ", sockets[mux]->sock_connected ? "true" : "false");
+// <MS>
     return sockets[mux]->sock_connected;
   }
 
@@ -735,7 +776,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         } else if (data.endsWith(GF(GSM_NL "SMS Ready" GSM_NL))) {
           data = "";
           DBG("### Unexpected module reset!");
-          init();
+// <MS>          
+//          init();
+// <MS>          
           data = "";
         }
       }
