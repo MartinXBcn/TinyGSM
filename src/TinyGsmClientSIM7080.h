@@ -529,7 +529,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
   size_t modemGetAvailable(uint8_t mux) {
     // If the socket doesn't exist, just return
 
-    DBG("<MS> modemGetAvailable >> mux: ", mux);
+    DBG("<MS> modemGetAvailable (#", mux, ") >>");
 
 // <MS>
 //    if (!sockets[mux]) { return 0; }
@@ -557,7 +557,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         result_sum += result;
 // <MS>        
 
-        DBG("<MS> modemGetAvailable ret_mux: ", ret_mux, ", available: ", result);
+        DBG("<MS> modemGetAvailable-A ret_mux: ", ret_mux, ", available: ", result);
 
         GsmClientSim7080* sock    = sockets[ret_mux];
         if (sock) { sock->sock_available = result; }
@@ -573,6 +573,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       } else if (res == 2) {
         // if we get an OK, we've reached the last socket with available data
         // so we set any we haven't gotten to yet to 0
+
+        DBG("<MS> modemGetAvailable-B muxNo: ", muxNo);
+
         for (int extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT;
              extra_mux++) {
           GsmClientSim7080* isock = sockets[extra_mux];
@@ -622,6 +625,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       if (res == 1) {
         int    ret_mux = streamGetIntBefore(',');
         size_t status  = streamGetIntBefore('\n');
+
+        DBG("<MS> modemGetConnected-A ret_mux: ", ret_mux, ", status: ", status);
+
         // 0: Closed by remote server or internal error
         // 1: Connected to remote server
         // 2: Listening (server mode)
@@ -630,6 +636,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
           sock->sock_connected = (status == 1); 
 // <MS>
           connected_sum = connected_sum | sock->sock_connected;
+// <MS>          
         }
         // if the first returned mux isn't 0 (or is higher than expected)
         // we need to fill in the missing muxes
@@ -643,6 +650,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       } else if (res == 2) {
         // if we get an OK, we've reached the last socket with available data
         // so we set any we haven't gotten to yet to 0
+
+        DBG("<MS> modemGetConnected-B muxNo: ", muxNo);
+
         for (int extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT;
              extra_mux++) {
           GsmClientSim7080* isock = sockets[extra_mux];
@@ -725,16 +735,19 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         } else if (data.endsWith(GF("+CARECV:"))) {
           int8_t  mux = streamGetIntBefore(',');
           int16_t len = streamGetIntBefore('\n');
+
+          DBG("<MS> waitResponse mux: ", mux, ", len: ", len);
+
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->got_data = true;
 // <MS>            
-            if (len >= 0 && len <= 1024) { sockets[mux]->sock_available = len; }
-/*            
+//            if (len >= 0 && len <= 1024) { sockets[mux]->sock_available = len; }
+/* */            
             if (len >= 0) { sockets[mux]->sock_available = len; }
             if ((len < 0) || (len > TINY_GSM_RX_BUFFER)) {
               DBG("<MS> waitResponse WARN len out of range: ", len);
             }
-*/            
+           
 // <MS>            
           }
           data = "";
