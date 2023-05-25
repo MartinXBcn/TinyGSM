@@ -765,7 +765,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             if (state != 1) {
               sockets[mux]->sock_connected = false;
-              DBG("### Closed: ", mux);
+              DBG("### Closed: ", mux, ", state: ", state);
             }
           }
           data = "";
