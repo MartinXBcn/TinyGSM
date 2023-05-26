@@ -1,3 +1,22 @@
+Forked from vshymanskyy/TinyGSM
+
+Adjustments in the code for SIM7080G (TinyGsmClientSIM7080.h):
+
+* Bugfixes.
+* Changes to use different sockets/mux connected to different servers in parallel. Therefore use of "crindex" added. To simplify impementation in the way to set crindex = mux (although this are different things and limits the use of mux to max. 6 because the range of crindex is 0-5).
+* Added concept to use of semaphores in the macros MS_TINY_GSM_SEM_xxx to avoid parallel calls/executions of functions when various sockets/mux are used in parallel.
+* Added further debugging-messages to understand and check the existing code (but it is possible that in some cases output of debugging effects the functionallity itself).
+
+Tested with SIM7080G (R1951.04) with ESP32 with two connections in parallel:
+* Socket 0 connected with Google-Firebase and doing data-uptades every minute on Firebase-RTDB, meanwhile
+* Socket 1 doing the download of an OTA-update (1.7 MByte) over about 8 minutes.
+
+Thank you for the great work of @vshymanskyy and all supporters of TinyGSM!
+  
+.    
+        
+  
+  
 [![SWUbanner](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner-direct.svg)](https://vshymanskyy.github.io/StandWithUkraine)
 
 ![TinyGSM logo](https://cdn.rawgit.com/vshymanskyy/TinyGSM/d18e93dc51fe988a0b175aac647185457ef640b5/extras/logo.svg)
