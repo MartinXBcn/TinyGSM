@@ -13,6 +13,11 @@
 
 // <MS>
 
+
+// To check in using program if correct forked library is used.
+#define MS_TINYGSMCLIENT_FORK 1
+
+
 extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 
 // Check [msTinyGsmSemCriticalProcess] and wait if necessary until it becomes available.
@@ -22,8 +27,10 @@ extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 		xSemaphoreTake(msTinyGsmSemCriticalProcess, portMAX_DELAY); \
 		DBG("### TINY_GSM ### ---> sem now available, proceed with code."); \
 	} else { \
-		DBG("### TINY_GSM ### ---> sem available, proceed with code."); \
 	}
+/*
+		DBG("### TINY_GSM ### ---> sem available, proceed with code."); \
+*/
 
 // Check [msTinyGsmSemCriticalProcess] w/o waiting, if available proceed with program code,
 // otherwise skip program code w/o waiting.
@@ -31,15 +38,20 @@ extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 	if (xSemaphoreTake(msTinyGsmSemCriticalProcess, 0) == pdFALSE) { \
 		DBG("### TINY_GSM ### ---> sem not available, do not wait, skip."); \
 	} else { \
+  }
+/*
 		DBG("### TINY_GSM ### ---> sem available, proceed with code."); \
-    
+*/
+
 // End of a block started with [MS_TINY_GSM_SEM_TAKE_WAIT].
 #define MS_TINY_GSM_SEM_GIVE_WAIT \
 	{ \
-		DBG("### TINY_GSM ### <--- sem-give"); \
 		BaseType_t r = xSemaphoreGive(msTinyGsmSemCriticalProcess); \
 		if (r != pdTRUE) DBG("### TINY_GSM ### <--- sem-give returned error."); \
 	} 
+/*
+		DBG("### TINY_GSM ### <--- sem-give"); \
+*/
 
 // End of a block started with [MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE].
 #define MS_TINY_GSM_SEM_GIVE_IF_AVAILABLE \
@@ -289,7 +301,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
    */
  protected:
   String getLocalIPImpl() {
-    DBG("<MS> getLocalIPImpl >>");
+//    DBG("<MS> getLocalIPImpl >>");
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
@@ -304,7 +316,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBG("<MS> getLocalIPImpl << return: ", res.c_str());
+//    DBG("<MS> getLocalIPImpl << return: ", res.c_str());
     return res;
   } // TinyGsmSim7080::getLocalIPImpl()
 
@@ -450,7 +462,11 @@ end:
 
     // set the connection (mux) identifier to use
     sendAT(GF("+CACID="), mux);
-    if (waitResponse(timeout_ms) != 1) { ret = false; goto end; }
+    if (waitResponse(timeout_ms) != 1) { 
+      DBG("<MS> ERROR set the connection mux identifier (#", mux, ") to use failed.");
+      ret = false; 
+      goto end; 
+    }
 
 
     if (ssl) {
@@ -468,7 +484,11 @@ end:
 //      sendAT(GF("+CSSLCFG=\"sslversion\",0,3"));  // TLS 1.2
       sendAT(GF("+CSSLCFG=\"sslversion\","), mux, GF(",3"));  // TLS 1.2
 // <MS>      
-      if (waitResponse(5000L) != 1)  { ret = false; goto end; }
+      if (waitResponse(5000L) != 1)  { 
+        DBG("<MS> ERROR set the ssl version failed.");
+        ret = false; 
+        goto end; 
+      }
     }
 
     // enable or disable ssl
@@ -494,22 +514,36 @@ end:
 //      sendAT(GF("+CSSLCFG=\"ctxindex\",0"));
       sendAT(GF("+CSSLCFG=\"ctxindex\","), mux);
 // <MS>      
-      if (waitResponse(5000L, GF("+CSSLCFG:")) != 1)  { ret = false; goto end; }
+      if (waitResponse(5000L, GF("+CSSLCFG:")) != 1)  { 
+        DBG("<MS> ERROR +CSSLCFG=\'ctxindex\'", mux, ") failed.");
+        ret = false; 
+        goto end; 
+      }
       streamSkipUntil('\n');  // read out the certificate information
       waitResponse();
 
       if (certificates[mux] != "") {
+        // <MS> Looks like that it is not possible to upload the certificate itself,
+        // but only link the cert-name which was "uploaded" in an other way before!
+        // Resume: IT DOES NOT WORK!
+
         // apply the correct certificate to the connection
         // AT+CASSLCFG=<cid>,"CACERT",<caname>
         // <cid> Application connection ID (set with AT+CACID above)
         // <certname> certificate name
+        DBG("<MS> set certificate ...");
         sendAT(GF("+CASSLCFG="), mux, ",CACERT,\"", certificates[mux].c_str(),
                "\"");
-        if (waitResponse(5000L) != 1)  { ret = false; goto end; }
+        if (waitResponse(5000L) != 1)  { 
+          DBG("<MS> ERROR set certificate failed.");
+          ret = false; 
+          goto end; 
+        }
       }
 
       // set the SSL SNI (server name indication)
       // NOTE:  despite docs using caps, "sni" must be in lower case
+      DBG("<MS> ", GF("+CSSLCFG=\"sni\","), mux, ',', GF("\""), host, GF("\""), " ...");
       sendAT(GF("+CSSLCFG=\"sni\","), mux, ',', GF("\""), host, GF("\""));
       waitResponse();
     }
