@@ -14,8 +14,8 @@
 // <MS>
 
 
-// To check in using program if correct forked library is used.
-#define MS_TINYGSMCLIENT_FORK 1
+// To check in using program if correct version of forked library is used.
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 230101600
 
 
 extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
@@ -105,11 +105,13 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 
     ~GsmClientSim7080() {
-//      DBG("<MS> ~GsmClientSim7080 mux: ", mux);
+      DBG("<MS-TinyGsm> ~GsmClientSim7080 >> mux: ", mux);
       at->sockets[this->mux] = NULL;
+      DBG("<MS-TinyGsm> ~GsmClientSim7080 <<");
     }
 
     bool init(TinyGsmSim7080* modem, uint8_t mux = 0) {
+      DBG("<MS-TinyGsm> init >> modem: ", modem->getModemName().c_str(), ", mux: ", mux);
       this->at       = modem;
       sock_available = 0;
       prev_check     = 0;
@@ -124,9 +126,11 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
       if (at->sockets[this->mux] == NULL) {
         at->sockets[this->mux] = this;
+        DBG("<MS-TinyGsm> init << return: true");
         return true;
       } else {
-        DBG("<MS> init ERROR.");
+        DBG("<MS-TinyGsm> init ERROR.");
+        DBG("<MS-TinyGsm> init << return: false");
         return false;
       }
     } // bool GsmClientSim7080::init(...)
@@ -142,7 +146,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     TINY_GSM_CLIENT_CONNECT_OVERRIDES
 
     void stop(uint32_t maxWaitMs) {
-      DBG("<MS> stop >>");
+      DBG("<MS-TinyGsm> stop >>");
 
       dumpModemBuffer(maxWaitMs);
 
@@ -154,7 +158,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
       MS_TINY_GSM_SEM_GIVE_WAIT
 
-      DBG("<MS> stop <<");
+      DBG("<MS-TinyGsm> stop <<");
     } // GsmClientSim7080::stop(...)
     
     void stop() override {
@@ -206,12 +210,12 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
   explicit TinyGsmSim7080(Stream& stream)
       : TinyGsmSim70xx<TinyGsmSim7080>(stream),
         certificates() {
-    DBG("<MS> TinyGsmSim7080 >>");
+    DBG("<MS-TinyGsm> TinyGsmSim7080 >>");
     memset(sockets, 0, sizeof(sockets));
 
     msTinyGsmSemCriticalProcess = xSemaphoreCreateMutex();
-    if (msTinyGsmSemCriticalProcess == NULL) DBG("<MS> init CRITICAL ERROR msTinyGsmSemCriticalProcess can not be created!");
-    DBG("<MS> TinyGsmSim7080 <<");
+    if (msTinyGsmSemCriticalProcess == NULL) DBG("<MS-TinyGsm> init CRITICAL ERROR msTinyGsmSemCriticalProcess can not be created!");
+    DBG("<MS-TinyGsm> TinyGsmSim7080 <<");
   } // TinyGsmSim7080::TinyGsmSim7080(...)
 
   /*
@@ -262,7 +266,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
   void maintainImpl() {
     // Keep listening for modem URC's and proactively iterate through
     // sockets asking if any data is avaiable
-    DBG("<MS> maintainImpl >>");
+    DBG("<MS-TinyGsm> maintainImpl >>");
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
@@ -287,7 +291,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBG("<MS> maintainImpl <<");
+    DBG("<MS-TinyGsm> maintainImpl <<");
   } // TinyGsmSim7080::maintainImpl()
 
   /*
@@ -301,7 +305,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
    */
  protected:
   String getLocalIPImpl() {
-//    DBG("<MS> getLocalIPImpl >>");
+//    DBG("<MS-TinyGsm> getLocalIPImpl >>");
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
@@ -316,7 +320,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-//    DBG("<MS> getLocalIPImpl << return: ", res.c_str());
+//    DBG("<MS-TinyGsm> getLocalIPImpl << return: ", res.c_str());
     return res;
   } // TinyGsmSim7080::getLocalIPImpl()
 
@@ -452,7 +456,7 @@ end:
  protected:
   bool modemConnect(const char* host, uint16_t port, uint8_t mux,
                     bool ssl = false, int timeout_s = 75) {
-    DBG("<MS> modemConnect (#", mux, ") >> host: ", host, ", port: ", port, ", ssl: ", ssl, ", timeout: ", timeout_s);
+    DBG("<MS-TinyGsm> modemConnect (#", mux, ") >> host: ", host, ", port: ", port, ", ssl: ", ssl, ", timeout: ", timeout_s);
 
     MS_TINY_GSM_SEM_TAKE_WAIT
     
@@ -463,7 +467,7 @@ end:
     // set the connection (mux) identifier to use
     sendAT(GF("+CACID="), mux);
     if (waitResponse(timeout_ms) != 1) { 
-      DBG("<MS> ERROR set the connection mux identifier (#", mux, ") to use failed.");
+      DBG("<MS-TinyGsm> ERROR set the connection mux identifier (#", mux, ") to use failed.");
       ret = false; 
       goto end; 
     }
@@ -485,7 +489,7 @@ end:
       sendAT(GF("+CSSLCFG=\"sslversion\","), mux, GF(",3"));  // TLS 1.2
 // <MS>      
       if (waitResponse(5000L) != 1)  { 
-        DBG("<MS> ERROR set the ssl version failed.");
+        DBG("<MS-TinyGsm> ERROR set the ssl version failed.");
         ret = false; 
         goto end; 
       }
@@ -515,7 +519,7 @@ end:
       sendAT(GF("+CSSLCFG=\"ctxindex\","), mux);
 // <MS>      
       if (waitResponse(5000L, GF("+CSSLCFG:")) != 1)  { 
-        DBG("<MS> ERROR +CSSLCFG=\'ctxindex\'", mux, ") failed.");
+        DBG("<MS-TinyGsm> ERROR +CSSLCFG=\'ctxindex\'", mux, ") failed.");
         ret = false; 
         goto end; 
       }
@@ -531,11 +535,11 @@ end:
         // AT+CASSLCFG=<cid>,"CACERT",<caname>
         // <cid> Application connection ID (set with AT+CACID above)
         // <certname> certificate name
-        DBG("<MS> set certificate ...");
+        DBG("<MS-TinyGsm> set certificate ...");
         sendAT(GF("+CASSLCFG="), mux, ",CACERT,\"", certificates[mux].c_str(),
                "\"");
         if (waitResponse(5000L) != 1)  { 
-          DBG("<MS> ERROR set certificate failed.");
+          DBG("<MS-TinyGsm> ERROR set certificate failed.");
           ret = false; 
           goto end; 
         }
@@ -543,7 +547,7 @@ end:
 
       // set the SSL SNI (server name indication)
       // NOTE:  despite docs using caps, "sni" must be in lower case
-      DBG("<MS> ", GF("+CSSLCFG=\"sni\","), mux, ',', GF("\""), host, GF("\""), " ...");
+      DBG("<MS-TinyGsm> ", GF("+CSSLCFG=\"sni\","), mux, ',', GF("\""), host, GF("\""), " ...");
       sendAT(GF("+CSSLCFG=\"sni\","), mux, ',', GF("\""), host, GF("\""));
       waitResponse();
     }
@@ -590,13 +594,13 @@ end:
 end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBG("<MS> modemConnect (#", mux, ") << return: ", ret, " (res: ", res, ")");
+    DBG("<MS-TinyGsm> modemConnect (#", mux, ") << return: ", ret, " (res: ", res, ")");
 
     return ret;
   } // ::modemConnect(...)
 
   int16_t modemSend(const void* buff, size_t len, uint8_t mux) {
-    DBG("<MS> modemSend >>");
+    DBG("<MS-TinyGsm> modemSend >>");
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
@@ -616,13 +620,13 @@ end:
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBG("<MS> modemSend <<");
+    DBG("<MS-TinyGsm> modemSend <<");
     return _len;
   } // ::modemSend(...)
 
   size_t modemRead(size_t size, uint8_t mux) {
     if (!sockets[mux]) { return 0; }
-    DBG("<MS> modemRead >>");
+    DBG("<MS-TinyGsm> modemRead >>");
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
@@ -649,7 +653,7 @@ end:
     // characters available, but in tests only the number is returned
 
     len_confirmed = stream.parseInt();
-    DBG("<MS> modemRead(#", mux, ") len_confirmed: ", len_confirmed);
+    DBG("<MS-TinyGsm> modemRead(#", mux, ") len_confirmed: ", len_confirmed);
     streamSkipUntil(',');  // skip the comma
     if (len_confirmed <= 0) {
       waitResponse();
@@ -676,14 +680,14 @@ end:
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBG("<MS> modemRead << return: ", _size);
+    DBG("<MS-TinyGsm> modemRead << return: ", _size);
     return _size;
   } // ::modemRead(...)
 
   size_t modemGetAvailable(uint8_t mux) {
     // If the socket doesn't exist, just return
 
-    DBG("<MS> modemGetAvailable (#", mux, ") >>");
+    DBG("<MS-TinyGsm> modemGetAvailable (#", mux, ") >>");
 
 //    if (!sockets[mux]) { return 0; }
     // If a mux is given (i.e. mux != -1) check only if this mux is in use. 
@@ -708,7 +712,7 @@ end:
         result_sum += result;
 // <MS>        
 
-        DBG("<MS> modemGetAvailable-A ret_mux: ", ret_mux, ", available: ", result);
+        DBG("<MS-TinyGsm> modemGetAvailable-A ret_mux: ", ret_mux, ", available: ", result);
 
         GsmClientSim7080* sock    = sockets[ret_mux];
         if (sock) { sock->sock_available = result; }
@@ -725,7 +729,7 @@ end:
         // if we get an OK, we've reached the last socket with available data
         // so we set any we haven't gotten to yet to 0
 
-        DBG("<MS> modemGetAvailable-B muxNo: ", muxNo);
+        DBG("<MS-TinyGsm> modemGetAvailable-B muxNo: ", muxNo);
 
         for (int extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT;
              extra_mux++) {
@@ -735,7 +739,7 @@ end:
         break;
       } else {
         // if we got an error, give up
-        DBG("<MS> modemGetAvailable ERROR.");
+        DBG("<MS-TinyGsm> modemGetAvailable ERROR.");
         break;
       }
       // Should be a final OK at the end.
@@ -748,15 +752,15 @@ end:
 // <MS>
     if (mux == (uint8_t)-1) {
       // No specific mux given, all active muxs updated, no specific return-value expected by caller.
-      DBG("<MS> modemGetAvailable (#", mux, ") << return: ", result_sum);
+      DBG("<MS-TinyGsm> modemGetAvailable (#", mux, ") << return: ", result_sum);
       // If there was at least one mux with available return > 0.
       return result_sum;
     }
 // <MS>
     if (!sockets[mux]) { 
-      DBG("<MS> modemGetAvailable (#", mux, ") << ERROR (sockets[mux] is null) return: 0");
+      DBG("<MS-TinyGsm> modemGetAvailable (#", mux, ") << ERROR (sockets[mux] is null) return: 0");
       return 0; }
-    DBG("<MS> modemGetAvailable (#", mux, ") << return: ", sockets[mux]->sock_available);
+    DBG("<MS-TinyGsm> modemGetAvailable (#", mux, ") << return: ", sockets[mux]->sock_available);
     return sockets[mux]->sock_available;
   } // ::modemGetAvailable(...)
 
@@ -779,7 +783,7 @@ end:
         int    ret_mux = streamGetIntBefore(',');
         size_t status  = streamGetIntBefore('\n');
 
-        DBG("<MS> modemGetConnected-A ret_mux: ", ret_mux, ", status: ", status);
+        DBG("<MS-TinyGsm> modemGetConnected-A ret_mux: ", ret_mux, ", status: ", status);
 
         // 0: Closed by remote server or internal error
         // 1: Connected to remote server
@@ -804,7 +808,7 @@ end:
         // if we get an OK, we've reached the last socket with available data
         // so we set any we haven't gotten to yet to 0
 
-        DBG("<MS> modemGetConnected-B muxNo: ", muxNo);
+        DBG("<MS-TinyGsm> modemGetConnected-B muxNo: ", muxNo);
 
         for (int extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT;
              extra_mux++) {
@@ -814,7 +818,7 @@ end:
         break;
       } else {
         // if we got an error, give up
-        DBG("<MS> modemGetConnected ERROR.");
+        DBG("<MS-TinyGsm> modemGetConnected ERROR.");
         break;
       }
       // Should be a final OK at the end.
@@ -826,11 +830,11 @@ end:
 // <MS>    
     if (mux == (uint8_t)-1) {
       // No specific mux given, all active muxs updated, no specific return-value expected by caller.
-      DBG("<MS> modemGetConnected (#", mux, ") return: ", connected_sum ? "true" : "false");
+      DBG("<MS-TinyGsm> modemGetConnected (#", mux, ") return: ", connected_sum ? "true" : "false");
       return connected_sum;
     }
 
-    DBG("<MS> modemGetConnected (#", mux, ") return: ", sockets[mux]->sock_connected ? "true" : "false");
+    DBG("<MS-TinyGsm> modemGetConnected (#", mux, ") return: ", sockets[mux]->sock_connected ? "true" : "false");
 // <MS>
     return sockets[mux]->sock_connected;
   }
@@ -890,7 +894,7 @@ end:
           int8_t  mux = streamGetIntBefore(',');
           int16_t len = streamGetIntBefore('\n');
 
-          DBG("<MS> waitResponse mux: ", mux, ", len: ", len);
+          DBG("<MS-TinyGsm> waitResponse mux: ", mux, ", len: ", len);
 
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->got_data = true;
@@ -899,7 +903,7 @@ end:
 /* */            
             if (len >= 0) { sockets[mux]->sock_available = len; }
             if ((len < 0) || (len > TINY_GSM_RX_BUFFER)) {
-              DBG("<MS> waitResponse WARN len out of range: ", len);
+              DBG("<MS-TinyGsm> waitResponse WARN len out of range: ", len);
             }
            
 // <MS>            
