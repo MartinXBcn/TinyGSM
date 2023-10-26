@@ -9,8 +9,6 @@
 #ifndef SRC_TINYGSMCLIENTSIM70XX_H_
 #define SRC_TINYGSMCLIENTSIM70XX_H_
 
-// #define TINY_GSM_DEBUG Serial
-// #define TINY_GSM_USE_HEX
 
 #include "TinyGsmBattery.tpp"
 #include "TinyGsmGPRS.tpp"
@@ -148,16 +146,28 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
    */
  public:
   RegStatus getRegistrationStatus() {
-    RegStatus epsStatus =
-        (RegStatus)thisModem().getRegistrationStatusXREG("CEREG");
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    RegStatus epsStatus = (RegStatus)thisModem().getRegistrationStatusXREG("CEREG");
+
     // If we're connected on EPS, great!
     if (epsStatus == REG_OK_HOME || epsStatus == REG_OK_ROAMING) {
-      return epsStatus;
     } else {
       // Otherwise, check GPRS network status
       // We could be using GPRS fall-back or the board could be being moody
-      return (RegStatus)thisModem().getRegistrationStatusXREG("CGREG");
+      epsStatus = (RegStatus)thisModem().getRegistrationStatusXREG("CGREG");
     }
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    if (epsStatus > REG_OK_ROAMING) {
+      DBGLOG(Warn, "[TinyGsmSim70xx] registration status unknown: %i", epsStatus)
+    }
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] << return registration status: %i", epsStatus)
+    return epsStatus;
   }
 
  protected:
@@ -168,19 +178,37 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
 
  public:
   String getNetworkModes() {
+    String res;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
     // Get the help string, not the setting value
     thisModem().sendAT(GF("+CNMP=?"));
-    if (thisModem().waitResponse(GF(GSM_NL "+CNMP:")) != 1) { return ""; }
-    String res = stream.readStringUntil('\n');
-    thisModem().waitResponse();
+    if (thisModem().waitResponse(GF(GSM_NL "+CNMP:")) != 1) {  
+    } else {
+      res = stream.readStringUntil('\n');
+      thisModem().waitResponse();
+    }
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
     return res;
   }
 
   int16_t getNetworkMode() {
+    int16_t mode = 0;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
     thisModem().sendAT(GF("+CNMP?"));
-    if (thisModem().waitResponse(GF(GSM_NL "+CNMP:")) != 1) { return false; }
-    int16_t mode = thisModem().streamGetIntBefore('\n');
-    thisModem().waitResponse();
+    if (thisModem().waitResponse(GF(GSM_NL "+CNMP:")) != 1) {
+    } else {
+        mode = thisModem().streamGetIntBefore('\n');
+        thisModem().waitResponse();
+    }
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
     return mode;
   }
 
@@ -194,19 +222,37 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   }
 
   String getPreferredModes() {
+    String res;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
     // Get the help string, not the setting value
     thisModem().sendAT(GF("+CMNB=?"));
-    if (thisModem().waitResponse(GF(GSM_NL "+CMNB:")) != 1) { return ""; }
-    String res = stream.readStringUntil('\n');
-    thisModem().waitResponse();
+    if (thisModem().waitResponse(GF(GSM_NL "+CMNB:")) != 1) { 
+    } else {
+      res = stream.readStringUntil('\n');
+      thisModem().waitResponse();
+    }
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
     return res;
   }
 
   int16_t getPreferredMode() {
+    int16_t mode = 0;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
     thisModem().sendAT(GF("+CMNB?"));
-    if (thisModem().waitResponse(GF(GSM_NL "+CMNB:")) != 1) { return false; }
-    int16_t mode = thisModem().streamGetIntBefore('\n');
-    thisModem().waitResponse();
+    if (thisModem().waitResponse(GF(GSM_NL "+CMNB:")) != 1) {
+    } else {
+      mode = thisModem().streamGetIntBefore('\n');
+      thisModem().waitResponse();
+    }
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
     return mode;
   }
 
