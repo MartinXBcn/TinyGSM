@@ -12,6 +12,70 @@
 // The current library version number
 #define TINYGSM_VERSION "0.11.5"
 
+
+
+
+// <MS> >>
+
+#ifdef TINY_GSM_DEBUG
+#define ESP32DEBUGGING 
+#else
+#undef ESP32DEBUGGING
+#endif
+#include "ESP32Logger.h"
+
+#define msTinyGsmLogLevel Debug
+
+extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
+
+//#define logLevelInfo Info
+#define logLevelInfo Debug
+#define logLevelWarn Warn
+
+// Check [msTinyGsmSemCriticalProcess] and wait if necessary until it becomes available.
+#define MS_TINY_GSM_SEM_TAKE_WAIT \
+	if (xSemaphoreTake(msTinyGsmSemCriticalProcess, 0) == pdFALSE) { \
+		DBGLOG(logLevelWarn, "### TINY_GSM ### ---> sem not available, wait until it becomes available."); \
+		xSemaphoreTake(msTinyGsmSemCriticalProcess, portMAX_DELAY); \
+		DBGLOG(logLevelWarn, "### TINY_GSM ### ---> sem now available, proceed with code."); \
+	} else { \
+  	DBGLOG(logLevelInfo, "### TINY_GSM ### ---> sem available, proceed with code."); \
+	}
+
+// Check [msTinyGsmSemCriticalProcess] w/o waiting, if available proceed with program code,
+// otherwise skip program code w/o waiting.
+#define MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE \
+	if (xSemaphoreTake(msTinyGsmSemCriticalProcess, 0) == pdFALSE) { \
+		DBGLOG(logLevelWarn, "### TINY_GSM ### ---> sem not available, do not wait, skip."); \
+	} else { \
+		DBGLOG(logLevelInfo, "### TINY_GSM ### ---> sem available, proceed with code."); \
+  }
+
+// End of a block started with [MS_TINY_GSM_SEM_TAKE_WAIT].
+#define MS_TINY_GSM_SEM_GIVE_WAIT \
+	{ \
+		BaseType_t r = xSemaphoreGive(msTinyGsmSemCriticalProcess); \
+		if (r != pdTRUE) DBG("### TINY_GSM ### <--- sem-give returned error."); \
+		DBGLOG(logLevelInfo, "### TINY_GSM ### <--- sem-give"); \
+	} 
+
+// End of a block started with [MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE].
+#define MS_TINY_GSM_SEM_GIVE_IF_AVAILABLE \
+		MS_TINY_GSM_SEM_GIVE_WAIT \
+	} 
+
+// Returns true if the semaphore is in use by an other function, 
+// or false if it is available.
+// Does not block anything, just checks.
+#define MS_TINY_GSM_SEM_BLOCKED \
+	(uxSemaphoreGetCount(msTinyGsmSemCriticalProcess) == 0)
+
+// <MS> <<
+
+
+
+
+
 #if defined(SPARK) || defined(PARTICLE)
 #include "Particle.h"
 #elif defined(ARDUINO)

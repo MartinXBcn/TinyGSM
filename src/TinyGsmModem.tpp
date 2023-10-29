@@ -30,7 +30,13 @@ class TinyGsmModem {
     TINY_GSM_YIELD(); /* DBG("### AT:", cmd...); */
   }
   void setBaud(uint32_t baud) {
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
     thisModem().setBaudImpl(baud);
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
   }
   // Test response to AT commands
   bool testAT(uint32_t timeout_ms = 10000L) {
@@ -40,12 +46,32 @@ class TinyGsmModem {
   // Asks for modem information via the V.25TER standard ATI command
   // NOTE:  The actual value and style of the response is quite varied
   String getModemInfo() {
-    return thisModem().getModemInfoImpl();
+    String s;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    s = thisModem().getModemInfoImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return s;
   }
   // Gets the modem name (as it calls itself)
+
+
   String getModemName() {
-    return thisModem().getModemNameImpl();
+    String s;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    s = thisModem().getModemNameImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return s;
   }
+
+
   bool factoryDefault() {
     return thisModem().factoryDefaultImpl();
   }
@@ -54,7 +80,15 @@ class TinyGsmModem {
    * Power functions
    */
   bool restart(const char* pin = NULL) {
-    return thisModem().restartImpl(pin);
+    bool b = false;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    b = thisModem().restartImpl(pin);
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return b;
   }
   bool poweroff() {
     return thisModem().powerOffImpl();
@@ -82,7 +116,15 @@ class TinyGsmModem {
   }
   // Gets signal quality report
   int16_t getSignalQuality() {
-    return thisModem().getSignalQualityImpl();
+    int16_t i = 0;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    i = thisModem().getSignalQualityImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return i;
   }
   String getLocalIP() {
     return thisModem().getLocalIPImpl();
@@ -217,6 +259,7 @@ class TinyGsmModem {
   }
 
   String getLocalIPImpl() {
+    DBGLOG(Error, "[TinyGsmModem] Dead code, should not be called!")
     thisModem().sendAT(GF("+CGPADDR=1"));
     if (thisModem().waitResponse(GF("+CGPADDR:")) != 1) { return ""; }
     thisModem().streamSkipUntil(',');  // Skip context id

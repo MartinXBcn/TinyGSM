@@ -22,12 +22,29 @@ class TinyGsmTime {
    * Time functions
    */
   String getGSMDateTime(TinyGSMDateTimeFormat format) {
-    return thisModem().getGSMDateTimeImpl(format);
+    String s;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    s = thisModem().getGSMDateTimeImpl(format);
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return s;
   }
+  
   bool getNetworkTime(int* year, int* month, int* day, int* hour, int* minute,
                       int* second, float* timezone) {
-    return thisModem().getNetworkTimeImpl(year, month, day, hour, minute,
+    bool b = false;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    b = thisModem().getNetworkTimeImpl(year, month, day, hour, minute,
                                           second, timezone);
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return b;
   }
 
   /*

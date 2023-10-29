@@ -28,22 +28,68 @@ class TinyGsmGPRS {
    */
   // Unlocks the SIM
   bool simUnlock(const char* pin) {
-    return thisModem().simUnlockImpl(pin);
+    bool b = false;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    b = thisModem().simUnlockImpl(pin);
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return b;
   }
   // Gets the CCID of a sim card via AT+CCID
   String getSimCCID() {
-    return thisModem().getSimCCIDImpl();
+    String s;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    s = thisModem().getSimCCIDImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return s;
   }
+
+
   // Asks for TA Serial Number Identification (IMEI)
   String getIMEI() {
-    return thisModem().getIMEIImpl();
+    String s;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    s = thisModem().getIMEIImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return s;
   }
+
+
   // Asks for International Mobile Subscriber Identity IMSI
   String getIMSI() {
-    return thisModem().getIMSIImpl();
+    String s;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    s = thisModem().getIMSIImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return s;
   }
+
+
   SimStatus getSimStatus(uint32_t timeout_ms = 10000L) {
-    return thisModem().getSimStatusImpl(timeout_ms);
+    SimStatus simstatus;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    simstatus = thisModem().getSimStatusImpl(timeout_ms);
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return simstatus;
   }
 
   /*
@@ -62,7 +108,15 @@ class TinyGsmGPRS {
   }
   // Gets the current network operator
   String getOperator() {
-    return thisModem().getOperatorImpl();
+    String o;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    o = thisModem().getOperatorImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return o;
   }
 
   /*
@@ -148,13 +202,24 @@ class TinyGsmGPRS {
  protected:
   // Checks if current attached to GPRS/EPS service
   bool isGprsConnectedImpl() {
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmGPRS] >>")
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    bool ret = false;
     thisModem().sendAT(GF("+CGATT?"));
     if (thisModem().waitResponse(GF("+CGATT:")) != 1) { return false; }
     int8_t res = thisModem().streamGetIntBefore('\n');
     thisModem().waitResponse();
-    if (res != 1) { return false; }
 
-    return thisModem().localIP() != IPAddress(0, 0, 0, 0);
+    // localIP() also blocks, therefore "give" already here.
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    if (res == 1) { ret = thisModem().localIP() != IPAddress(0, 0, 0, 0); }
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmGPRS] << return: %s", DBGB2S(ret))
+
+    return ret;
   }
 
   // Gets the current network operator via the 3GPP TS command AT+COPS

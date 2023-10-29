@@ -20,18 +20,42 @@ class TinyGsmGSMLocation {
    * GSM Location functions
    */
   String getGsmLocationRaw() {
-    return thisModem().getGsmLocationRawImpl();
+    String s;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    s = thisModem().getGsmLocationRawImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return s;
   }
 
   String getGsmLocation() {
-    return thisModem().getGsmLocationRawImpl();
+    String s;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    s = thisModem().getGsmLocationRawImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return s;
   }
 
   bool getGsmLocation(float* lat, float* lon, float* accuracy = 0,
                       int* year = 0, int* month = 0, int* day = 0,
                       int* hour = 0, int* minute = 0, int* second = 0) {
-    return thisModem().getGsmLocationImpl(lat, lon, accuracy, year, month, day,
+    bool b = false;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
+    b = thisModem().getGsmLocationImpl(lat, lon, accuracy, year, month, day,
                                           hour, minute, second);
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return b;
   };
 
   bool getGsmLocationTime(int* year, int* month, int* day, int* hour,
@@ -39,8 +63,10 @@ class TinyGsmGSMLocation {
     float lat      = 0;
     float lon      = 0;
     float accuracy = 0;
-    return thisModem().getGsmLocation(&lat, &lon, &accuracy, year, month, day,
+    bool b = false;
+    b = thisModem().getGsmLocation(&lat, &lon, &accuracy, year, month, day,
                                       hour, minute, second);
+    return b;
   }
 
   /*
