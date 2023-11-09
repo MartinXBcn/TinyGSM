@@ -82,9 +82,7 @@ class TinyGsmTime {
 
   bool getNetworkTimeImpl(int* year, int* month, int* day, int* hour,
                           int* minute, int* second, float* timezone) {
-    thisModem().sendAT(GF("+CCLK?"));
-    if (thisModem().waitResponse(2000L, GF("+CCLK: \"")) != 1) { return false; }
-
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] >>")
     int iyear     = 0;
     int imonth    = 0;
     int iday      = 0;
@@ -92,6 +90,25 @@ class TinyGsmTime {
     int imin      = 0;
     int isec      = 0;
     int itimezone = 0;
+    char tzSign;
+    bool ret = false;
+
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CLTS?")
+    thisModem().sendAT(GF("+CLTS?"));
+    thisModem().waitResponse(2000L);
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CLTS=?")
+    thisModem().sendAT(GF("+CLTS=?"));
+    thisModem().waitResponse(2000L);
+
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CCLK?")
+    thisModem().sendAT(GF("+CCLK?"));
+    if (thisModem().waitResponse(2000L, GF("+CCLK: \"")) != 1) { 
+      DBGLOG(Error, "[TinyGsmTime] read-time failed!")
+      goto end; 
+    }
 
     // Date & Time
     iyear       = thisModem().streamGetIntBefore('/');
@@ -100,7 +117,7 @@ class TinyGsmTime {
     ihour       = thisModem().streamGetIntBefore(':');
     imin        = thisModem().streamGetIntBefore(':');
     isec        = thisModem().streamGetIntLength(2);
-    char tzSign = thisModem().stream.read();
+    tzSign      = thisModem().stream.read();
     itimezone   = thisModem().streamGetIntBefore('\n');
     if (tzSign == '-') { itimezone = itimezone * -1; }
 
@@ -116,7 +133,11 @@ class TinyGsmTime {
 
     // Final OK
     thisModem().waitResponse();
-    return true;
+    ret = true;
+
+end:    
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] >> return: %s", DBGB2S(ret))
+    return ret;
   }
 };
 
