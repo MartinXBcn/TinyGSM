@@ -247,6 +247,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       goto end; 
     }
 
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
     ret = getSimStatus();
     // if the sim isn't ready and a pin has been provided, try to unlock the sim
     if (ret != SIM_READY && pin != NULL && strlen(pin) > 0) {
@@ -257,9 +259,12 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       r = (ret == SIM_READY) || (ret == SIM_LOCKED);
     }
 
+    goto endx;
+
 end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
+endx:
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] << return: %s", DBGB2S(r));
     return r;
   } // TinyGsmSim7080::initImpl(...)
@@ -873,6 +878,9 @@ end:
    */
  public:
   // TODO(vshymanskyy): Optimize this!
+
+  #define msTinyGsmLogLevelWaitResp Debug
+
   int msCallLevelWaitResponse = 0;
   int8_t waitResponse(uint32_t timeout_ms, String& data,
                       GsmConstStr r1 = GFP(GSM_OK),
@@ -885,7 +893,7 @@ end:
 #endif
                       GsmConstStr r5 = NULL) {
     msCallLevelWaitResponse++;
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i >>", msCallLevelWaitResponse)
+    DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i >>", msCallLevelWaitResponse)
     DBGCHK(Warn, MS_TINY_GSM_SEM_BLOCKED, "[TinyGsmSim7080]-%i Not blocked by calling function", msCallLevelWaitResponse)
 
     data.reserve(64);
@@ -922,7 +930,7 @@ end:
           int8_t  mux = streamGetIntBefore(',');
           int16_t len = streamGetIntBefore('\n');
 
-          DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i mux: %hhi, len: %hi", msCallLevelWaitResponse, mux, len);
+          DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i mux: %hhi, len: %hi", msCallLevelWaitResponse, mux, len);
 
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->got_data = true;
@@ -931,20 +939,20 @@ end:
 /* */            
             if (len >= 0) { sockets[mux]->sock_available = len; }
             if ((len < 0) || (len > TINY_GSM_RX_BUFFER)) {
-              DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i WARN len out of range: %hi", msCallLevelWaitResponse, len);
+              DBGLOG(Warn, "[TinyGsmSim7080]-%i WARN len out of range: %hi", msCallLevelWaitResponse, len);
             }
            
 // <MS>            
           }
           data = "";
-          DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i Got Data: %hi on mux: %hhi", msCallLevelWaitResponse, len, mux);
+          DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i Got Data: %hi on mux: %hhi", msCallLevelWaitResponse, len, mux);
         } else if (data.endsWith(GF("+CADATAIND:"))) {
           int8_t mux = streamGetIntBefore('\n');
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->got_data = true;
           }
           data = "";
-          DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080::waitResponse]-%i Got data on mux: %hhi", msCallLevelWaitResponse, mux);
+          DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080::waitResponse]-%i Got data on mux: %hhi", msCallLevelWaitResponse, mux);
         } else if (data.endsWith(GF("+CASTATE:"))) {
           int8_t mux   = streamGetIntBefore(',');
           int8_t state = streamGetIntBefore('\n');
@@ -998,7 +1006,7 @@ end:
       String r3s(r3); r3s.trim();
       String r4s(r4); r4s.trim();
       String r5s(r5); r5s.trim();
-      DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i Input: %s, %s, %s, %s, %s", 
+      DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i Input: %s, %s, %s, %s, %s", 
         msCallLevelWaitResponse, 
         asCharString(r1s.c_str(), 0, r1s.length()).c_str(),
         asCharString(r2s.c_str(), 0, r2s.length()).c_str(),
@@ -1006,11 +1014,11 @@ end:
         asCharString(r4s.c_str(), 0, r4s.length()).c_str(),
         asCharString(r5s.c_str(), 0, r5s.length()).c_str()
         )
-      DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i Return data: %s, return index: %hhu", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str(), index)
+      DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i Return data: %s, return index: %hhu", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str(), index)
     }
 #endif
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i << return index: %hhu", msCallLevelWaitResponse, index)
+    DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i << return index: %hhu", msCallLevelWaitResponse, index)
     msCallLevelWaitResponse--;
 
     return index;
