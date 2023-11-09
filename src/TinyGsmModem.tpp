@@ -82,7 +82,7 @@ class TinyGsmModem {
   bool restart(const char* pin = NULL) {
     bool b = false;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getModemName")
+    MS_TINY_GSM_SEM_TAKE_WAIT("restart")
 
     b = thisModem().restartImpl(pin);
 

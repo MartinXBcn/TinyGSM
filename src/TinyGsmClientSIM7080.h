@@ -72,7 +72,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 
     bool init(TinyGsmSim7080* modem, uint8_t mux = 0) {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] >> modem: %s, mux: %hhu", modem->getModemName().c_str(), mux)
+      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] >> mux: %hhu", mux)
       this->at       = modem;
       sock_available = 0;
       prev_check     = 0;
@@ -151,7 +151,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
     explicit GsmClientSecureSIM7080(TinyGsmSim7080& modem, uint8_t mux = 0)
         : GsmClientSim7080(modem, mux) {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] >> modem: %s, %hhu", modem.getModemName().c_str(), mux)
+      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] >> mux: %hhu", mux)
       DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] <<")
     }
 
@@ -207,10 +207,18 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
     MS_TINY_GSM_SEM_TAKE_WAIT("initImpl")
 
-    if (!testAT()) { r = false; goto end; }
+    if (!testAT()) { 
+      DBGLOG(Error, "[TinyGsmSim7080] testAT() failed! Stop.")
+      r = false; 
+      goto end; 
+    }
 
     sendAT(GF("E0"));  // Echo Off
-    if (waitResponse() != 1) { r = false; goto end; }
+    if (waitResponse() != 1) { 
+      DBGLOG(Error, "[TinyGsmSim7080] Echo-off failed! Stop.")
+      r = false; 
+      goto end; 
+    }
 
 #ifdef TINY_GSM_DEBUG
     sendAT(GF("+CMEE=2"));  // turn on verbose error codes
@@ -219,18 +227,25 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 #endif
     waitResponse();
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] Modem: %s", getModemName().c_str());
-
     // Enable Local Time Stamp for getting network time
     sendAT(GF("+CLTS=1"));
-    if (waitResponse(10000L) != 1) { r = false; goto end; }
+    if (waitResponse(10000L) != 1) { 
+      DBGLOG(Error, "[TinyGsmSim7080] Enable-local-timestamp failed! Stop.")
+      r = false; 
+      goto end; 
+    }
 
     // Enable battery checks
 // <MS>
 //    sendAT(GF("+CBATCHK=1"));
+    // Disable battery checks
     sendAT(GF("+CBATCHK=0"));
 // <MS>
-    if (waitResponse() != 1) { r = false; goto end; }
+    if (waitResponse() != 1) { 
+      DBGLOG(Error, "[TinyGsmSim7080] Disable-bat-checks failed! Stop.")
+      r = false; 
+      goto end; 
+    }
 
     ret = getSimStatus();
     // if the sim isn't ready and a pin has been provided, try to unlock the sim

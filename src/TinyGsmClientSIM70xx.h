@@ -117,9 +117,9 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
     DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] >>")
     bool ret = false;
 //    thisModem().sendAT(GF("E0"));  // Echo Off
-    thisModem().waitResponse();
-    if (!thisModem().setPhoneFunctionality(0)) { return false; }
-    if (!thisModem().setPhoneFunctionality(1, true)) { return false; }
+//    thisModem().waitResponse();
+    if (!thisModem().setPhoneFunctionality(0)) { goto end; }
+    if (!thisModem().setPhoneFunctionality(1, true)) { goto end; }
     thisModem().waitResponse(30000L, GF("SMS Ready"));
     ret = thisModem().initImpl(pin);
   end:    
