@@ -512,6 +512,35 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
     return thisModem().waitResponse(1000, r1, r2, r3, r4, r5);
   }
 
+  // <MS>
+  bool setNetlight() {
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+SLEDS=?")
+    thisModem().sendAT(GF("+SLEDS=?"));
+    thisModem().waitResponse(2000L);
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+SLEDS?")
+    thisModem().sendAT(GF("+SLEDS?"));
+    thisModem().waitResponse(2000L);
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CNETLIGHT=?")
+    thisModem().sendAT(GF("+CNETLIGHT=?"));
+    thisModem().waitResponse(2000L);
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CNETLIGHT?")
+    thisModem().sendAT(GF("+CNETLIGHT?"));
+    thisModem().waitResponse(2000L);
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CSGS=?")
+    thisModem().sendAT(GF("+CSGS=?"));
+    thisModem().waitResponse(2000L);
+
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CSGS?")
+    thisModem().sendAT(GF("+CSGS?"));
+    thisModem().waitResponse(2000L);
+
+    return true;
+  }
+
  public:
   Stream& stream;
 
