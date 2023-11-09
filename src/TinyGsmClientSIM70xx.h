@@ -114,12 +114,17 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
    */
  protected:
   bool restartImpl(const char* pin = NULL) {
-    thisModem().sendAT(GF("E0"));  // Echo Off
+    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] >>")
+    bool ret = false;
+//    thisModem().sendAT(GF("E0"));  // Echo Off
     thisModem().waitResponse();
     if (!thisModem().setPhoneFunctionality(0)) { return false; }
     if (!thisModem().setPhoneFunctionality(1, true)) { return false; }
     thisModem().waitResponse(30000L, GF("SMS Ready"));
-    return thisModem().initImpl(pin);
+    ret = thisModem().initImpl(pin);
+  end:    
+    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] << return: %s", DBGB2S(ret))
+    return ret;
   }
 
   bool powerOffImpl() {
@@ -137,8 +142,20 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   }
 
   bool setPhoneFunctionalityImpl(uint8_t fun, bool reset = false) {
+    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] >>")
+  #ifdef TINY_GSM_DEBUG
+    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] AT+CFUN=?")
+    thisModem().sendAT(GF("+CFUN=?"));
+    thisModem().waitResponse(10000L);
+    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] AT+CFUN?")
+    thisModem().sendAT(GF("+CFUN?"));
+    thisModem().waitResponse(10000L);
+  #endif
+    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] AT+CFUN=%hhu%s", fun, reset ? ",1" : "")
     thisModem().sendAT(GF("+CFUN="), fun, reset ? ",1" : "");
-    return thisModem().waitResponse(10000L) == 1;
+    bool ret = thisModem().waitResponse(10000L) == 1;
+    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] << return: %s", DBGB2S(ret))
+    return ret;
   }
 
   /*
@@ -148,7 +165,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   RegStatus getRegistrationStatus() {
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getRegistrationStatus")
 
     RegStatus epsStatus = (RegStatus)thisModem().getRegistrationStatusXREG("CEREG");
 
@@ -180,7 +197,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   String getNetworkModes() {
     String res;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkModes")
 
     // Get the help string, not the setting value
     thisModem().sendAT(GF("+CNMP=?"));
@@ -198,7 +215,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   int16_t getNetworkMode() {
     int16_t mode = 0;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkMode")
 
     thisModem().sendAT(GF("+CNMP?"));
     if (thisModem().waitResponse(GF(GSM_NL "+CNMP:")) != 1) {
@@ -224,7 +241,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   String getPreferredModes() {
     String res;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getPreferredModes")
 
     // Get the help string, not the setting value
     thisModem().sendAT(GF("+CMNB=?"));
@@ -242,7 +259,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   int16_t getPreferredMode() {
     int16_t mode = 0;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getPreferredMode")
 
     thisModem().sendAT(GF("+CMNB?"));
     if (thisModem().waitResponse(GF(GSM_NL "+CMNB:")) != 1) {

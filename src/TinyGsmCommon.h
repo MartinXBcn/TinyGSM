@@ -24,7 +24,8 @@
 #endif
 #include "ESP32Logger.h"
 
-#define msTinyGsmLogLevel Debug
+//#define msTinyGsmLogLevel Debug
+#define msTinyGsmLogLevel Info
 
 extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 
@@ -32,31 +33,39 @@ extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 #define logLevelInfo Debug
 #define logLevelWarn Warn
 
+#define MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN 64
+extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];
+
 // Check [msTinyGsmSemCriticalProcess] and wait if necessary until it becomes available.
-#define MS_TINY_GSM_SEM_TAKE_WAIT \
+#define MS_TINY_GSM_SEM_TAKE_WAIT(blockedby) \
 	if (xSemaphoreTake(msTinyGsmSemCriticalProcess, 0) == pdFALSE) { \
-		DBGLOG(logLevelWarn, "### TINY_GSM ### ---> sem not available, wait until it becomes available."); \
+		DBGLOG(logLevelWarn, "### TINY_GSM ### ---> sem not available, wait until it becomes available. Blocked by: %s", msTinyGsmSemBlockedBy); \
 		xSemaphoreTake(msTinyGsmSemCriticalProcess, portMAX_DELAY); \
+		ms_strncpy(msTinyGsmSemBlockedBy, blockedby, strlen(blockedby), MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN); \
 		DBGLOG(logLevelWarn, "### TINY_GSM ### ---> sem now available, proceed with code."); \
 	} else { \
+		ms_strncpy(msTinyGsmSemBlockedBy, blockedby, strlen(blockedby), MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN); \
   	DBGLOG(logLevelInfo, "### TINY_GSM ### ---> sem available, proceed with code."); \
 	}
 
 // Check [msTinyGsmSemCriticalProcess] w/o waiting, if available proceed with program code,
 // otherwise skip program code w/o waiting.
-#define MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE \
+#define MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE(blockedby) \
 	if (xSemaphoreTake(msTinyGsmSemCriticalProcess, 0) == pdFALSE) { \
-		DBGLOG(logLevelWarn, "### TINY_GSM ### ---> sem not available, do not wait, skip."); \
+		DBGLOG(logLevelWarn, "### TINY_GSM ### ---> sem not available, do not wait, skip. Blocked by: %s", msTinyGsmSemBlockedBy); \
 	} else { \
+		ms_strncpy(msTinyGsmSemBlockedBy, blockedby, strlen(blockedby), MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN); \
 		DBGLOG(logLevelInfo, "### TINY_GSM ### ---> sem available, proceed with code."); \
   }
 
 // End of a block started with [MS_TINY_GSM_SEM_TAKE_WAIT].
 #define MS_TINY_GSM_SEM_GIVE_WAIT \
 	{ \
-		BaseType_t r = xSemaphoreGive(msTinyGsmSemCriticalProcess); \
-		if (r != pdTRUE) DBG("### TINY_GSM ### <--- sem-give returned error."); \
 		DBGLOG(logLevelInfo, "### TINY_GSM ### <--- sem-give"); \
+		ms_strncpy(msTinyGsmSemBlockedBy, "", 0, MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN); \
+		DBGCOD(BaseType_t r =) \
+    xSemaphoreGive(msTinyGsmSemCriticalProcess); \
+		DBGCHK(Error, r == pdTRUE, "### TINY_GSM ### <--- sem-give returned error."); \
 	} 
 
 // End of a block started with [MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE].

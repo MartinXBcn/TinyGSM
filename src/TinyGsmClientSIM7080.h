@@ -22,7 +22,7 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 230102500
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 230110900
 
 
 // For char-to-hex-conversion.
@@ -114,7 +114,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
       dumpModemBuffer(maxWaitMs);
 
-      MS_TINY_GSM_SEM_TAKE_WAIT
+      MS_TINY_GSM_SEM_TAKE_WAIT("stop")
 
       at->sendAT(GF("+CACLOSE="), mux);
       sock_connected = false;
@@ -205,7 +205,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] Version: %s", TINYGSM_VERSION);
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] Compiled Module: TinyGsmClientSIM7080");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("initImpl")
 
     if (!testAT()) { r = false; goto end; }
 
@@ -254,7 +254,7 @@ end:
     // sockets asking if any data is avaiable
 //    DBGLOG(Info, "[TinyGsmSim7080::maintainImpl] >>");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("maintainImpl")
 
     bool check_socks = false;
     for (int mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
@@ -293,7 +293,7 @@ end:
   String getLocalIPImpl() {
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >>");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getLocalIPImpl")
 
     String res;
 
@@ -340,7 +340,7 @@ end:
     gprsDisconnect();
 
     // gprsDisconnect() has its own "blocking".
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("gprsConnectImpl")
 
     // Define the PDP context
     sendAT(GF("+CGDCONT=1,\"IP\",\""), apn, '"');
@@ -411,7 +411,7 @@ end:
     // CNACT will close *all* open application connections
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >>");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("gprsDisconnectImpl")
 
     bool ret = false;
 
@@ -470,7 +470,7 @@ end:
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %huu, host: '%s', port: %hu, ssl: %s, timeout: %i", 
       mux, host == NULL ? "-" : host, port, DBGB2S(ssl), timeout_s)
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("modemConnect")
     
     uint32_t timeout_ms = ((uint32_t)timeout_s) * 1000;
     bool ret = false;
@@ -614,7 +614,7 @@ end:
   int16_t modemSend(const void* buff, size_t len, uint8_t mux) {
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %hhu", mux);
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("modemSend")
 
     size_t _len = len;
 
@@ -640,7 +640,7 @@ end:
     if (!sockets[mux]) { return 0; }
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %hhu", mux);
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("modemRead")
 
     int16_t len_confirmed;
     size_t _size = size;

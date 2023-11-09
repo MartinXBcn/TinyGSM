@@ -22,7 +22,7 @@ class TinyGsmGSMLocation {
   String getGsmLocationRaw() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getGsmLocationRaw")
 
     s = thisModem().getGsmLocationRawImpl();
 
@@ -34,7 +34,7 @@ class TinyGsmGSMLocation {
   String getGsmLocation() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getGsmLocation")
 
     s = thisModem().getGsmLocationRawImpl();
 
@@ -48,7 +48,7 @@ class TinyGsmGSMLocation {
                       int* hour = 0, int* minute = 0, int* second = 0) {
     bool b = false;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getGsmLocation")
 
     b = thisModem().getGsmLocationImpl(lat, lon, accuracy, year, month, day,
                                           hour, minute, second);

@@ -30,7 +30,7 @@ class TinyGsmGPRS {
   bool simUnlock(const char* pin) {
     bool b = false;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("simUnlock")
 
     b = thisModem().simUnlockImpl(pin);
 
@@ -42,7 +42,7 @@ class TinyGsmGPRS {
   String getSimCCID() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getSimCCID")
 
     s = thisModem().getSimCCIDImpl();
 
@@ -56,7 +56,7 @@ class TinyGsmGPRS {
   String getIMEI() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getIMEI")
 
     s = thisModem().getIMEIImpl();
 
@@ -70,7 +70,7 @@ class TinyGsmGPRS {
   String getIMSI() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getIMSI")
 
     s = thisModem().getIMSIImpl();
 
@@ -83,7 +83,7 @@ class TinyGsmGPRS {
   SimStatus getSimStatus(uint32_t timeout_ms = 10000L) {
     SimStatus simstatus;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getSimStatus")
 
     simstatus = thisModem().getSimStatusImpl(timeout_ms);
 
@@ -110,7 +110,7 @@ class TinyGsmGPRS {
   String getOperator() {
     String o;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("getOperator")
 
     o = thisModem().getOperatorImpl();
 
@@ -204,12 +204,18 @@ class TinyGsmGPRS {
   bool isGprsConnectedImpl() {
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmGPRS] >>")
 
-    MS_TINY_GSM_SEM_TAKE_WAIT
+    MS_TINY_GSM_SEM_TAKE_WAIT("isGprsConnectedImpl")
 
+    int8_t res;
     bool ret = false;
     thisModem().sendAT(GF("+CGATT?"));
-    if (thisModem().waitResponse(GF("+CGATT:")) != 1) { return false; }
-    int8_t res = thisModem().streamGetIntBefore('\n');
+    if (thisModem().waitResponse(GF("+CGATT:")) != 1) { 
+
+      MS_TINY_GSM_SEM_GIVE_WAIT
+      
+      goto end; 
+    }
+    res = thisModem().streamGetIntBefore('\n');
     thisModem().waitResponse();
 
     // localIP() also blocks, therefore "give" already here.
@@ -217,6 +223,7 @@ class TinyGsmGPRS {
 
     if (res == 1) { ret = thisModem().localIP() != IPAddress(0, 0, 0, 0); }
 
+end:
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmGPRS] << return: %s", DBGB2S(ret))
 
     return ret;
