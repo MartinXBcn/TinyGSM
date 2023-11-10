@@ -205,7 +205,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] Version: %s", TINYGSM_VERSION);
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] Compiled Module: TinyGsmClientSIM7080");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("initImpl")
+// Not necessary, should only be called anyway when any other gsm-function runs in parallel.
+//    MS_TINY_GSM_SEM_TAKE_WAIT("initImpl")
 
     if (!testAT()) { 
       DBGLOG(Error, "[TinyGsmSim7080] testAT() failed! Stop.")
@@ -247,7 +248,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       goto end; 
     }
 
-    MS_TINY_GSM_SEM_GIVE_WAIT
+//    MS_TINY_GSM_SEM_GIVE_WAIT
 
     ret = getSimStatus();
     // if the sim isn't ready and a pin has been provided, try to unlock the sim
@@ -262,7 +263,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     goto endx;
 
 end:
-    MS_TINY_GSM_SEM_GIVE_WAIT
+//    MS_TINY_GSM_SEM_GIVE_WAIT
 
 endx:
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] << return: %s", DBGB2S(r));
