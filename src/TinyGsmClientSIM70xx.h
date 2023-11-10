@@ -513,7 +513,13 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   }
 
   // <MS>
-  bool setNetlight() {
+  /**
+  // @brief       Logs actual settings of AT-SLEDS, AT-CNETLIGHT, AT-CSGS.
+  // @return      true = okay
+  // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
+  //              
+  **/
+  bool reportNetlightStatus() {
     DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+SLEDS=?")
     thisModem().sendAT(GF("+SLEDS=?"));
     thisModem().waitResponse(2000L);
@@ -539,7 +545,71 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
     thisModem().waitResponse(2000L);
 
     return true;
-  }
+  } // TinyGsmSim70xx.reportNetlightStatus
+
+
+  // <MS>
+  /**
+  // @brief       Sets behaviour of netlight-led (AT-SLEDS).
+  // @param       mode      1-not registered (e.g. no sim), 2-registered to net, 3-connected.
+  // @param       timerOn   duration (0-65535ms) led is on.
+  // @param       timerOff  duration (0-65535ms) led is off.
+  // @return      true = okay
+  // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
+  // @note        Will only be effective if activated with setNetlightIndication(2).
+  //              
+  **/
+  bool setNetlightTimerPeriod(uint8_t mode, uint16_t timerOn, uint16_t timerOff) {
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
+    DBGCHK(Warn, (mode >= 0) && (mode <= 2), "[TinyGsmSim70xx] Invalid mode (must be 1, 2, 3): %hhu", mode)
+    DBGCHK(Warn, (timerOn == 0) || (timerOn >= 40), "[TinyGsmSim70xx] Invalid timerOn (0 or 40..65535): %hu", timerOn)
+    DBGCHK(Warn, (timerOff == 0) || (timerOff >= 40), "[TinyGsmSim70xx] Invalid timerOff (0 or 40..65535): %hu", timerOff)
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] AT+SLEDS=%hhu,%hu,%hu", mode, timerOn, timerOff)
+    thisModem().sendAT(GF("+SLEDS="), mode, GF(","), timerOn, GF(","), timerOff);
+    int8_t ret = thisModem().waitResponse(2000L);
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
+    return ret == 1;
+  } // TinyGsmSim70xx.setNetlightTimerPeriod
+
+
+  // <MS>
+  /**
+  // @brief       Turns netlight-led on and off (AT-CNETLIGHT).
+  // @param       mode      0-off, 1-on.
+  // @return      true = okay
+  // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
+  //              
+  **/
+  bool setNetlightOn(uint8_t mode) {
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
+    DBGCHK(Warn, (mode >= 0) && (mode <= 1), "[TinyGsmSim70xx] Invalid mode: %hhu", mode)
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] AT+CNETLIGHT=%hhu", mode)
+    thisModem().sendAT(GF("+CNETLIGHT="), mode);
+    int8_t ret = thisModem().waitResponse(2000L);
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
+    return ret == 1;
+  } // TinyGsmSim70xx.setNetlightOn
+
+
+  // <MS>
+  /**
+  // @brief       Sets behaviour of netlight-led (AT-CSGS).
+  // @param       mode      0-off, 1-on.
+  // @param       timerOn   duration (0-65535ms) led is on.
+  // @param       timerOff  duration (0-65535ms) led is off.
+  // @return      true = okay
+  // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
+  //              
+  **/
+  bool setNetlightIndication(uint8_t mode) {
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
+    DBGCHK(Warn, (mode >= 0) && (mode <= 2), "[TinyGsmSim70xx] Invalid mode: %hhu", mode)
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] AT+CSGS=%hhu", mode)
+    thisModem().sendAT(GF("+CSGS="), mode);
+    int8_t ret = thisModem().waitResponse(2000L);
+    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
+    return ret == 1;
+  } // TinyGsmSim70xx.setNetlightOn
 
  public:
   Stream& stream;
