@@ -82,11 +82,12 @@ class TinyGsmModem {
   bool restart(const char* pin = NULL) {
     bool b = false;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("restart")
+// Not necessary, should only be called anyway when any other gsm-function runs in parallel.
+//    MS_TINY_GSM_SEM_TAKE_WAIT("restart")
 
     b = thisModem().restartImpl(pin);
 
-    MS_TINY_GSM_SEM_GIVE_WAIT
+//    MS_TINY_GSM_SEM_GIVE_WAIT
 
     return b;
   }
