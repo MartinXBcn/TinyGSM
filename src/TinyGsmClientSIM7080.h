@@ -20,11 +20,6 @@
 */
 
 
-// <MS>
-// To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 230110900
-
-
 // For char-to-hex-conversion.
 #include "ms_General.h"
 
