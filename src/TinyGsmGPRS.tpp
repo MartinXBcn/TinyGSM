@@ -202,7 +202,7 @@ class TinyGsmGPRS {
  protected:
   // Checks if current attached to GPRS/EPS service
   bool isGprsConnectedImpl() {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmGPRS] >>")
+    DBGLOG(Debug, "[TinyGsmGPRS] >>")
 
     MS_TINY_GSM_SEM_TAKE_WAIT("isGprsConnectedImpl")
 
@@ -224,7 +224,7 @@ class TinyGsmGPRS {
     if (res == 1) { ret = thisModem().localIP() != IPAddress(0, 0, 0, 0); }
 
 end:
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmGPRS] << return: %s", DBGB2S(ret))
+    DBGLOG(Debug, "[TinyGsmGPRS] << return: %s", DBGB2S(ret))
 
     return ret;
   }

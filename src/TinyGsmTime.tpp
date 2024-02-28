@@ -82,7 +82,7 @@ class TinyGsmTime {
 
   bool getNetworkTimeImpl(int* year, int* month, int* day, int* hour,
                           int* minute, int* second, float* timezone) {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] >>")
+    DBGLOG(Info, "[TinyGsmTime] >>")
     int iyear     = 0;
     int imonth    = 0;
     int iday      = 0;
@@ -94,16 +94,16 @@ class TinyGsmTime {
     bool ret = false;
 
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CLTS?")
+    DBGLOG(Info, "[TinyGsmTime] AT+CLTS?")
     thisModem().sendAT(GF("+CLTS?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CLTS=?")
+    DBGLOG(Info, "[TinyGsmTime] AT+CLTS=?")
     thisModem().sendAT(GF("+CLTS=?"));
     thisModem().waitResponse(2000L);
 
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CCLK?")
+    DBGLOG(Info, "[TinyGsmTime] AT+CCLK?")
     thisModem().sendAT(GF("+CCLK?"));
     if (thisModem().waitResponse(2000L, GF("+CCLK: \"")) != 1) { 
       DBGLOG(Error, "[TinyGsmTime] read-time failed!")
@@ -136,7 +136,7 @@ class TinyGsmTime {
     ret = true;
 
 end:    
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] >> return: %s", DBGB2S(ret))
+    DBGLOG(Info, "[TinyGsmTime] >> return: %s", DBGB2S(ret))
     return ret;
   }
 };

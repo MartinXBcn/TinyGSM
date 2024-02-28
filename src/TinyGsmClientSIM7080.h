@@ -10,16 +10,6 @@
 #define SRC_TINYGSMCLIENTSIM7080_H_
 
 
-/*
-#ifdef TINY_GSM_DEBUG
-#define ESP32DEBUGGING 
-#else
-#undef ESP32DEBUGGING
-#endif
-#include "ESP32Logger.h"
-*/
-
-
 // For char-to-hex-conversion.
 #include "ms_General.h"
 
@@ -51,9 +41,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
    public:
     GsmClientSim7080() {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] >>")
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] ATTENTION: constructor does not do anything!")
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] <<")
+      DBGLOG(Info, "[GsmClientSim7080] >>")
+      DBGLOG(Info, "[GsmClientSim7080] ATTENTION: constructor does not do anything!")
+      DBGLOG(Info, "[GsmClientSim7080] <<")
     }
 
     explicit GsmClientSim7080(TinyGsmSim7080& modem, uint8_t mux = 0) {
@@ -61,13 +51,13 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 
     ~GsmClientSim7080() {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] >> mux: ", mux)
+      DBGLOG(Info, "[GsmClientSim7080] >> mux: ", mux)
       at->sockets[this->mux] = NULL;
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] <<")
+      DBGLOG(Info, "[GsmClientSim7080] <<")
     }
 
     bool init(TinyGsmSim7080* modem, uint8_t mux = 0) {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] >> mux: %hhu", mux)
+      DBGLOG(Info, "[GsmClientSim7080] >> mux: %hhu", mux)
       this->at       = modem;
       sock_available = 0;
       prev_check     = 0;
@@ -88,24 +78,24 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         DBGLOG(Warn, "[GsmClientSim7080] ERROR.")
         r = false;
       }
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] << return: %s", DBGB2S(r))
+      DBGLOG(Info, "[GsmClientSim7080] << return: %s", DBGB2S(r))
       return r;
     } // bool GsmClientSim7080::init(...)
 
    public:
     virtual int connect(const char* host, uint16_t port, int timeout_s) {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] >>")
+      DBGLOG(Info, "[GsmClientSim7080] >>")
       stop();
       TINY_GSM_YIELD();
       rx.clear();
       sock_connected = at->modemConnect(host, port, mux, false, timeout_s);
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] << return sock_connected: %s", DBGB2S(sock_connected))
+      DBGLOG(Info, "[GsmClientSim7080] << return sock_connected: %s", DBGB2S(sock_connected))
       return sock_connected;
     } // GsmClientSim7080::int connect(...)
     TINY_GSM_CLIENT_CONNECT_OVERRIDES
 
     void stop(uint32_t maxWaitMs) {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] >>")
+      DBGLOG(Info, "[GsmClientSim7080] >>")
 
       dumpModemBuffer(maxWaitMs);
 
@@ -117,7 +107,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
       MS_TINY_GSM_SEM_GIVE_WAIT
 
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSim7080] <<")
+      DBGLOG(Info, "[GsmClientSim7080] <<")
     } // GsmClientSim7080::stop(...)
     
     void stop() override {
@@ -139,33 +129,33 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
   class GsmClientSecureSIM7080 : public GsmClientSim7080 {
    public:
     GsmClientSecureSIM7080() {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] >>")
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] ATTENTION: constructor does not do anything!")
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] <<")
+      DBGLOG(Info, "[GsmClientSecureSIM7080] >>")
+      DBGLOG(Info, "[GsmClientSecureSIM7080] ATTENTION: constructor does not do anything!")
+      DBGLOG(Info, "[GsmClientSecureSIM7080] <<")
     }
 
     explicit GsmClientSecureSIM7080(TinyGsmSim7080& modem, uint8_t mux = 0)
         : GsmClientSim7080(modem, mux) {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] >> mux: %hhu", mux)
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] <<")
+      DBGLOG(Info, "[GsmClientSecureSIM7080] >> mux: %hhu", mux)
+      DBGLOG(Info, "[GsmClientSecureSIM7080] <<")
     }
 
    public:
     bool setCertificate(const String& certificateName) {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] >> certificateName: '%s'", certificateName.c_str())
+      DBGLOG(Info, "[GsmClientSecureSIM7080] >> certificateName: '%s'", certificateName.c_str())
       bool r = at->setCertificate(certificateName, mux);
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] << return: %s", DBGB2S(r))
+      DBGLOG(Info, "[GsmClientSecureSIM7080] << return: %s", DBGB2S(r))
       return r;
     }
 
     virtual int connect(const char* host, uint16_t port,
                         int timeout_s) override {
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] >> host: '%s', port: %hu", host == NULL ? "-" : host, port)
+      DBGLOG(Info, "[GsmClientSecureSIM7080] >> host: '%s', port: %hu", host == NULL ? "-" : host, port)
       stop();
       TINY_GSM_YIELD();
       rx.clear();
       sock_connected = at->modemConnect(host, port, mux, true, timeout_s);
-      DBGLOG(msTinyGsmLogLevel, "[GsmClientSecureSIM7080] << return sock_connected: %s", DBGB2S(sock_connected))
+      DBGLOG(Info, "[GsmClientSecureSIM7080] << return sock_connected: %s", DBGB2S(sock_connected))
       return sock_connected;
     } // GsmClientSecureSIM7080::connect(...)
     TINY_GSM_CLIENT_CONNECT_OVERRIDES
@@ -181,12 +171,12 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
   explicit TinyGsmSim7080(Stream& stream)
       : TinyGsmSim70xx<TinyGsmSim7080>(stream),
         certificates() {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >>");
+    DBGLOG(Info, "[TinyGsmSim7080] >>");
     memset(sockets, 0, sizeof(sockets));
 
     msTinyGsmSemCriticalProcess = xSemaphoreCreateMutex();
     if (msTinyGsmSemCriticalProcess == NULL) DBGLOG(Error, "[TinyGsmSim7080] CRITICAL ERROR msTinyGsmSemCriticalProcess can not be created!");
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] <<");
+    DBGLOG(Info, "[TinyGsmSim7080] <<");
   } // TinyGsmSim7080::TinyGsmSim7080(...)
 
   /*
@@ -196,12 +186,11 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
   bool initImpl(const char* pin = NULL) {
     SimStatus ret;
     bool r = false;
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> pin: '%s'", pin == NULL ? "-" : pin);
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] Version: %s", TINYGSM_VERSION);
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] Compiled Module: TinyGsmClientSIM7080");
+    DBGLOG(Info, "[TinyGsmSim7080] >> pin: '%s'", pin == NULL ? "-" : pin);
+    DBGLOG(Info, "[TinyGsmSim7080] Version: %s", TINYGSM_VERSION);
+    DBGLOG(Info, "[TinyGsmSim7080] Compiled Module: TinyGsmClientSIM7080");
 
-// Not necessary, should only be called anyway when any other gsm-function runs in parallel.
-//    MS_TINY_GSM_SEM_TAKE_WAIT("initImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT("initImpl")
 
     if (!testAT()) { 
       DBGLOG(Error, "[TinyGsmSim7080] testAT() failed! Stop.")
@@ -243,7 +232,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       goto end; 
     }
 
-//    MS_TINY_GSM_SEM_GIVE_WAIT
+    MS_TINY_GSM_SEM_GIVE_WAIT
 
     ret = getSimStatus();
     // if the sim isn't ready and a pin has been provided, try to unlock the sim
@@ -258,10 +247,10 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     goto endx;
 
 end:
-//    MS_TINY_GSM_SEM_GIVE_WAIT
+    MS_TINY_GSM_SEM_GIVE_WAIT
 
 endx:
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] << return: %s", DBGB2S(r));
+    DBGLOG(Info, "[TinyGsmSim7080] << return: %s", DBGB2S(r));
     return r;
   } // TinyGsmSim7080::initImpl(...)
 
@@ -283,7 +272,7 @@ endx:
     // modemGetAvailable checks all socks, so we only want to do it once
     // modemGetAvailable calls modemGetConnected(), which also checks allf
 
-// <MS>
+// <MS> #####
 //    if (check_socks) { modemGetAvailable(0); }
     // Check all mux in use (-1).
     if (check_socks) { modemGetAvailable((uint8_t)-1); }
@@ -307,7 +296,7 @@ endx:
    */
  protected:
   String getLocalIPImpl() {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >>");
+    DBGLOG(Debug, "[TinyGsmSim7080] >>");
 
     MS_TINY_GSM_SEM_TAKE_WAIT("getLocalIPImpl")
 
@@ -322,7 +311,7 @@ endx:
 end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] << return: %s", res.c_str());
+    DBGLOG(Debug, "[TinyGsmSim7080] << return: %s", res.c_str());
     return res;
   } // TinyGsmSim7080::getLocalIPImpl()
 
@@ -332,14 +321,14 @@ end:
  protected:
   bool setCertificate(const String& certificateName, const uint8_t mux = 0) {
     bool r = false;
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %hhu, certificateName: '%s'", mux, certificateName.c_str());
+    DBGLOG(Info, "[TinyGsmSim7080] >> mux: %hhu, certificateName: '%s'", mux, certificateName.c_str());
     if (mux >= TINY_GSM_MUX_COUNT) {
       r = false; 
     } else {
       certificates[mux] = certificateName;
       r = true;
     }
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] << return: %s", DBGB2S(r));
+    DBGLOG(Info, "[TinyGsmSim7080] << return: %s", DBGB2S(r));
     return r;
   }
 
@@ -349,7 +338,7 @@ end:
  protected:
   bool gprsConnectImpl(const char* apn, const char* user = NULL,
                        const char* pwd = NULL) {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> apn: '%s', user: %s", apn == NULL ? "-" : apn, user == NULL ? "-" : user);
+    DBGLOG(Info, "[TinyGsmSim7080] >> apn: '%s', user: %s", apn == NULL ? "-" : apn, user == NULL ? "-" : user);
     bool res    = false;
     int  ntries = 0;
 
@@ -358,9 +347,13 @@ end:
     // gprsDisconnect() has its own "blocking".
     MS_TINY_GSM_SEM_TAKE_WAIT("gprsConnectImpl")
 
+    DBGLOG(Info, "[TinyGsmSim7080] -1- CGDCONT")
+
     // Define the PDP context
     sendAT(GF("+CGDCONT=1,\"IP\",\""), apn, '"');
     waitResponse();
+
+    DBGLOG(Info, "[TinyGsmSim7080] -2- CGATT")
 
     // Attach to GPRS
     sendAT(GF("+CGATT=1"));
@@ -370,10 +363,14 @@ end:
     // For who only knows what reason, doing so screws up the rest of the
     // process
 
+    DBGLOG(Info, "[TinyGsmSim7080] -3- CGNAPN")
+
     // Check the APN returned by the server
     // not sure why, but the connection is more consistent with this
     sendAT(GF("+CGNAPN"));
     waitResponse();
+
+    DBGLOG(Info, "[TinyGsmSim7080] -4- CNCFG")
 
     // Bearer settings for applications based on IP
     // Set the user name and password
@@ -408,6 +405,7 @@ end:
     //          1: Active
     //          2: Auto Active
     while (!res && ntries < 5) {
+      DBGLOG(Info, "[TinyGsmSim7080] CNACT ntries: %i", ntries);
       sendAT(GF("+CNACT=0,1"));
       res = waitResponse(60000L, GF(GSM_NL "+APP PDP: 0,ACTIVE"),
                          GF(GSM_NL "+APP PDP: 0,DEACTIVE"));
@@ -415,17 +413,17 @@ end:
       ntries++;
     }
 
-end:
+  end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] << return: %s", DBGB2S(res));
+    DBGLOG(Info, "[TinyGsmSim7080] << return: %s", DBGB2S(res));
     return res;
   } // TinyGsmSim7080::gprsConnectImpl(...)
 
   bool gprsDisconnectImpl() {
     // Shut down the general application TCP/IP connection
     // CNACT will close *all* open application connections
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >>");
+    DBGLOG(Info, "[TinyGsmSim7080] >>");
 
     MS_TINY_GSM_SEM_TAKE_WAIT("gprsDisconnectImpl")
 
@@ -439,8 +437,8 @@ end:
 
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] << return: %s", DBGB2S(ret));
-    return true;
+    DBGLOG(Info, "[TinyGsmSim7080] << return: %s", DBGB2S(ret));
+    return ret;
   } // TinyGsmSim7080::gprsDisconnectImpl()
 
   /*
@@ -483,7 +481,7 @@ end:
  protected:
   bool modemConnect(const char* host, uint16_t port, uint8_t mux,
                     bool ssl = false, int timeout_s = 75) {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %huu, host: '%s', port: %hu, ssl: %s, timeout: %i", 
+    DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %huu, host: '%s', port: %hu, ssl: %s, timeout: %i", 
       mux, host == NULL ? "-" : host, port, DBGB2S(ssl), timeout_s)
 
     MS_TINY_GSM_SEM_TAKE_WAIT("modemConnect")
@@ -563,7 +561,7 @@ end:
         // AT+CASSLCFG=<cid>,"CACERT",<caname>
         // <cid> Application connection ID (set with AT+CACID above)
         // <certname> certificate name
-        DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] set certificate ...");
+        DBGLOG(Info, "[TinyGsmSim7080] set certificate ...");
         sendAT(GF("+CASSLCFG="), mux, ",CACERT,\"", certificates[mux].c_str(),
                "\"");
         if (waitResponse(5000L) != 1)  { 
@@ -575,7 +573,7 @@ end:
 
       // set the SSL SNI (server name indication)
       // NOTE:  despite docs using caps, "sni" must be in lower case
-      DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] +CSSLCFG=/sni/ ...")
+      DBGLOG(Info, "[TinyGsmSim7080] +CSSLCFG=/sni/ ...")
       sendAT(GF("+CSSLCFG=\"sni\","), mux, ',', GF("\""), host, GF("\""));
       waitResponse();
     }
@@ -622,13 +620,13 @@ end:
 end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] (#%hhu) << return: %s, res: %hhi", mux, DBGB2S(ret), res);
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %s, res: %hhi", mux, DBGB2S(ret), res);
 
     return ret;
   } // ::modemConnect(...)
 
   int16_t modemSend(const void* buff, size_t len, uint8_t mux) {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %hhu", mux);
+    DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux);
 
     MS_TINY_GSM_SEM_TAKE_WAIT("modemSend")
 
@@ -648,13 +646,13 @@ end:
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, _len);
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, _len);
     return _len;
   } // ::modemSend(...)
 
   size_t modemRead(size_t size, uint8_t mux) {
     if (!sockets[mux]) { return 0; }
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %hhu", mux);
+    DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux);
 
     MS_TINY_GSM_SEM_TAKE_WAIT("modemRead")
 
@@ -681,7 +679,7 @@ end:
     // characters available, but in tests only the number is returned
 
     len_confirmed = stream.parseInt();
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] (#%hhu) len_confirmed: %hi", mux, len_confirmed);
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) len_confirmed: %hi", mux, len_confirmed);
     streamSkipUntil(',');  // skip the comma
     if (len_confirmed <= 0) {
       waitResponse();
@@ -708,20 +706,20 @@ end:
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, _size);
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, _size);
     return _size;
   } // ::modemRead(...)
 
   size_t modemGetAvailable(uint8_t mux) {
     // If the socket doesn't exist, just return
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %hhu", mux);
+    DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux);
     DBGCHK(Warn, MS_TINY_GSM_SEM_BLOCKED, "[TinyGsmSim7080] Not blocked by calling function")
 
 //    if (!sockets[mux]) { return 0; }
     // If a mux is given (i.e. mux != -1) check only if this mux is in use. 
     if ((mux != (uint8_t)-1) && (!sockets[mux])) { 
-      DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] << mux #%hhu not used, return: 0", mux);
+      DBGLOG(Debug, "[TinyGsmSim7080] << mux #%hhu not used, return: 0", mux);
       return 0; 
     }
 
@@ -780,14 +778,14 @@ end:
     modemGetConnected(mux);  // check the state of all connections
     if (mux == (uint8_t)-1) {
       // No specific mux given, all active muxs updated, no specific return-value expected by caller.
-      DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, result_sum);
+      DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, result_sum);
       // If there was at least one mux with available return > 0.
       return result_sum;
     }
     if (!sockets[mux]) { 
       DBGLOG(Warn, "[TinyGsmSim7080] (#%hhu) << ERROR (sockets[mux] is null) return: 0", mux);
       return 0; }
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] (#%hhu) << return: %hu", mux, sockets[mux]->sock_available);
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %hu", mux, sockets[mux]->sock_available);
     return sockets[mux]->sock_available;
   } // ::modemGetAvailable(...)
 
@@ -795,7 +793,7 @@ end:
   bool modemGetConnected(uint8_t mux) {
     // NOTE:  This gets the state of all connections that have been opened
     // since the last connection
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] >> mux: %hhu", mux)
+    DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux)
     DBGCHK(Warn, MS_TINY_GSM_SEM_BLOCKED, "[TinyGsmSim7080] Not blocked by calling function")
 
     sendAT(GF("+CASTATE?"));
@@ -814,7 +812,7 @@ end:
         size_t status  = streamGetIntBefore('\n');
 
 //        DBG("<MS-TinyGsm> [TinyGsmSim7080::modemGetConnected]-A ret_mux: ", ret_mux, ", status: ", status);
-        DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-A ret_mux: %i, status: %u", ret_mux, status)
+        DBGLOG(Debug, "[TinyGsmSim7080]-A ret_mux: %i, status: %u", ret_mux, status)
 
         // 0: Closed by remote server or internal error
         // 1: Connected to remote server
@@ -840,7 +838,7 @@ end:
         // so we set any we haven't gotten to yet to 0
 
 //        DBG("<MS-TinyGsm> [TinyGsmSim7080::modemGetConnected]-B muxNo: ", muxNo);
-        DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-B muxNo: %i", muxNo)
+        DBGLOG(Debug, "[TinyGsmSim7080]-B muxNo: %i", muxNo)
 
         for (int extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT;
              extra_mux++) {
@@ -861,11 +859,11 @@ end:
 
     if (mux == (uint8_t)-1) {
       // No specific mux given, all active muxs updated, no specific return-value expected by caller.
-      DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] mux: %hhu, << return: %s", mux, DBGB2S(connected_sum))
+      DBGLOG(Debug, "[TinyGsmSim7080] mux: %hhu, << return: %s", mux, DBGB2S(connected_sum))
       return connected_sum;
     }
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080] mux: %hhu, << return: %s", mux, DBGB2S(sockets[mux]->sock_connected))
+    DBGLOG(Debug, "[TinyGsmSim7080] mux: %hhu, << return: %s", mux, DBGB2S(sockets[mux]->sock_connected))
     return sockets[mux]->sock_connected;
   } // ::modemGetConnected(...)
 
@@ -874,8 +872,6 @@ end:
    */
  public:
   // TODO(vshymanskyy): Optimize this!
-
-  #define msTinyGsmLogLevelWaitResp Debug
 
   int msCallLevelWaitResponse = 0;
   int8_t waitResponse(uint32_t timeout_ms, String& data,
@@ -889,7 +885,7 @@ end:
 #endif
                       GsmConstStr r5 = NULL) {
     msCallLevelWaitResponse++;
-    DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i >>", msCallLevelWaitResponse)
+    DBGLOG(Debug, "[TinyGsmSim7080]-%i >>", msCallLevelWaitResponse)
     DBGCHK(Warn, MS_TINY_GSM_SEM_BLOCKED, "[TinyGsmSim7080]-%i Not blocked by calling function", msCallLevelWaitResponse)
 
     data.reserve(64);
@@ -926,7 +922,7 @@ end:
           int8_t  mux = streamGetIntBefore(',');
           int16_t len = streamGetIntBefore('\n');
 
-          DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i mux: %hhi, len: %hi", msCallLevelWaitResponse, mux, len);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i mux: %hhi, len: %hi", msCallLevelWaitResponse, mux, len);
 
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->got_data = true;
@@ -941,41 +937,41 @@ end:
 // <MS>            
           }
           data = "";
-          DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i Got Data: %hi on mux: %hhi", msCallLevelWaitResponse, len, mux);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Got Data: %hi on mux: %hhi", msCallLevelWaitResponse, len, mux);
         } else if (data.endsWith(GF("+CADATAIND:"))) {
           int8_t mux = streamGetIntBefore('\n');
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->got_data = true;
           }
           data = "";
-          DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080::waitResponse]-%i Got data on mux: %hhi", msCallLevelWaitResponse, mux);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Got data on mux: %hhi", msCallLevelWaitResponse, mux);
         } else if (data.endsWith(GF("+CASTATE:"))) {
           int8_t mux   = streamGetIntBefore(',');
           int8_t state = streamGetIntBefore('\n');
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             if (state != 1) {
               sockets[mux]->sock_connected = false;
-              DBGLOG(Warn, "[TinyGsmSim7080]-%i Closed, mux: %hhi, state: %hhi", msCallLevelWaitResponse, mux, state);
+              DBGLOG(Info, "[TinyGsmSim7080]-%i Closed, mux: %hhi, state: %hhi", msCallLevelWaitResponse, mux, state);
             }
           }
           data = "";
         } else if (data.endsWith(GF("*PSNWID:"))) {
           streamSkipUntil('\n');  // Refresh network name by network
           data = "";
-          DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i Network name updated.", msCallLevelWaitResponse);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Network name updated.", msCallLevelWaitResponse);
         } else if (data.endsWith(GF("*PSUTTZ:"))) {
           streamSkipUntil('\n');  // Refresh time and time zone by network
           data = "";
-          DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i Network time and time zone updated.", msCallLevelWaitResponse);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Network time and time zone updated.", msCallLevelWaitResponse);
         } else if (data.endsWith(GF("+CTZV:"))) {
           streamSkipUntil('\n');  // Refresh network time zone by network
           data = "";
-          DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i Network time zone updated.", msCallLevelWaitResponse);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Network time zone updated.", msCallLevelWaitResponse);
         } else if (data.endsWith(GF("DST: "))) {
           streamSkipUntil(
               '\n');  // Refresh Network Daylight Saving Time by network
           data = "";
-          DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim7080]-%i Daylight savings time state updated.", msCallLevelWaitResponse);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Daylight savings time state updated.", msCallLevelWaitResponse);
         } else if (data.endsWith(GF(GSM_NL "SMS Ready" GSM_NL))) {
           data = "";
           DBGLOG(Error, "[TinyGsmSim7080]-%i Unexpected module reset!", msCallLevelWaitResponse);
@@ -994,15 +990,15 @@ end:
     }
     data.replace(GSM_NL, "/");
     // DBG('<', index, '>', data);
-
+/*
 #if defined TINY_GSM_DEBUG
-    if (index != 1) {
+//    if (index != 1) {
       String r1s(r1); r1s.trim();
       String r2s(r2); r2s.trim();
       String r3s(r3); r3s.trim();
       String r4s(r4); r4s.trim();
       String r5s(r5); r5s.trim();
-      DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i Input: %s, %s, %s, %s, %s", 
+      DBGLOG(Info, "[TinyGsmSim7080]-%i Input r1:%s, r2:%s, r3:%s, r4:%s, r5:%s", 
         msCallLevelWaitResponse, 
         asCharString(r1s.c_str(), 0, r1s.length()).c_str(),
         asCharString(r2s.c_str(), 0, r2s.length()).c_str(),
@@ -1010,11 +1006,11 @@ end:
         asCharString(r4s.c_str(), 0, r4s.length()).c_str(),
         asCharString(r5s.c_str(), 0, r5s.length()).c_str()
         )
-      DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i Return data: %s, return index: %hhu", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str(), index)
-    }
+      DBGLOG(Info, "[TinyGsmSim7080]-%i Return data: %s, return index: %hhu", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str(), index)
+//    }
 #endif
-
-    DBGLOG(msTinyGsmLogLevelWaitResp, "[TinyGsmSim7080]-%i << return index: %hhu", msCallLevelWaitResponse, index)
+*/
+    DBGLOG(Debug, "[TinyGsmSim7080]-%i << return index: %hhu", msCallLevelWaitResponse, index)
     msCallLevelWaitResponse--;
 
     return index;

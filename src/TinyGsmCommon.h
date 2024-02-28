@@ -16,25 +16,26 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 230111000
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240022800
 
 
-#ifdef TINY_GSM_DEBUG
+#ifdef MS_TINYGSM_LOGGING
 #define ESP32DEBUGGING 
+#ifndef MS_LOGGER_LEVEL
+#define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
+#endif
 #else
 #undef ESP32DEBUGGING
 #endif
 #include "ESP32Logger.h"
 
 
-//#define msTinyGsmLogLevel Debug
-#define msTinyGsmLogLevel Debug
-
-
 extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 
 #define logLevelSemTinyGsmInfo Debug
-#define logLevelSemTinyGsmWarn Debug
+//#define logLevelSemTinyGsmInfo Info
+#define logLevelSemTinyGsmWarn Warn
+//#define logLevelSemTinyGsmWarn Debug
 
 #define MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN 64
 DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)

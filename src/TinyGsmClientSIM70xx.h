@@ -114,7 +114,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
    */
  protected:
   bool restartImpl(const char* pin = NULL) {
-    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] >>")
+    DBGLOG(Info, "[GsmClientSim70xx] >>")
     bool ret = false;
 //    thisModem().sendAT(GF("E0"));  // Echo Off
 //    thisModem().waitResponse();
@@ -123,7 +123,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
     thisModem().waitResponse(30000L, GF("SMS Ready"));
     ret = thisModem().initImpl(pin);
   end:    
-    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] << return: %s", DBGB2S(ret))
+    DBGLOG(Info, "[GsmClientSim70xx] << return: %s", DBGB2S(ret))
     return ret;
   }
 
@@ -142,19 +142,19 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   }
 
   bool setPhoneFunctionalityImpl(uint8_t fun, bool reset = false) {
-    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] >>")
+    DBGLOG(Info, "[GsmClientSim70xx] >>")
   #ifdef TINY_GSM_DEBUG
-    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] AT+CFUN=?")
+    DBGLOG(Info, "[GsmClientSim70xx] AT+CFUN=?")
     thisModem().sendAT(GF("+CFUN=?"));
     thisModem().waitResponse(10000L);
-    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] AT+CFUN?")
+    DBGLOG(Info, "[GsmClientSim70xx] AT+CFUN?")
     thisModem().sendAT(GF("+CFUN?"));
     thisModem().waitResponse(10000L);
   #endif
-    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] AT+CFUN=%hhu%s", fun, reset ? ",1" : "")
+    DBGLOG(Info, "[GsmClientSim70xx] AT+CFUN=%hhu%s", fun, reset ? ",1" : "")
     thisModem().sendAT(GF("+CFUN="), fun, reset ? ",1" : "");
     bool ret = thisModem().waitResponse(10000L) == 1;
-    DBGLOG(msTinyGsmLogLevel, "[GsmClientSim70xx] << return: %s", DBGB2S(ret))
+    DBGLOG(Info, "[GsmClientSim70xx] << return: %s", DBGB2S(ret))
     return ret;
   }
 
@@ -163,7 +163,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
    */
  public:
   RegStatus getRegistrationStatus() {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
+    DBGLOG(Info, "[TinyGsmSim70xx] >>")
 
     MS_TINY_GSM_SEM_TAKE_WAIT("getRegistrationStatus")
 
@@ -183,7 +183,7 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
       DBGLOG(Warn, "[TinyGsmSim70xx] registration status unknown: %i", epsStatus)
     }
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] << return registration status: %i", epsStatus)
+    DBGLOG(Info, "[TinyGsmSim70xx] << return registration status: %i", epsStatus)
     return epsStatus;
   }
 
@@ -520,29 +520,34 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   //              
   **/
   bool reportNetlightStatus() {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+SLEDS=?")
+  
+    MS_TINY_GSM_SEM_TAKE_WAIT("reportNetlightStatus")
+
+    DBGLOG(Info, "[TinyGsmTime] AT+SLEDS=?")
     thisModem().sendAT(GF("+SLEDS=?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+SLEDS?")
+    DBGLOG(Info, "[TinyGsmTime] AT+SLEDS?")
     thisModem().sendAT(GF("+SLEDS?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CNETLIGHT=?")
+    DBGLOG(Info, "[TinyGsmTime] AT+CNETLIGHT=?")
     thisModem().sendAT(GF("+CNETLIGHT=?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CNETLIGHT?")
+    DBGLOG(Info, "[TinyGsmTime] AT+CNETLIGHT?")
     thisModem().sendAT(GF("+CNETLIGHT?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CSGS=?")
+    DBGLOG(Info, "[TinyGsmTime] AT+CSGS=?")
     thisModem().sendAT(GF("+CSGS=?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmTime] AT+CSGS?")
+    DBGLOG(Info, "[TinyGsmTime] AT+CSGS?")
     thisModem().sendAT(GF("+CSGS?"));
     thisModem().waitResponse(2000L);
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
 
     return true;
   } // TinyGsmSim70xx.reportNetlightStatus
@@ -560,14 +565,20 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   //              
   **/
   bool setNetlightTimerPeriod(uint8_t mode, uint16_t timerOn, uint16_t timerOff) {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
-    DBGCHK(Warn, (mode >= 0) && (mode <= 2), "[TinyGsmSim70xx] Invalid mode (must be 1, 2, 3): %hhu", mode)
+    DBGLOG(Info, "[TinyGsmSim70xx] >>")
+    DBGCHK(Warn, (mode >= 1) && (mode <= 3), "[TinyGsmSim70xx] Invalid mode (must be 1, 2, 3): %hhu", mode)
     DBGCHK(Warn, (timerOn == 0) || (timerOn >= 40), "[TinyGsmSim70xx] Invalid timerOn (0 or 40..65535): %hu", timerOn)
     DBGCHK(Warn, (timerOff == 0) || (timerOff >= 40), "[TinyGsmSim70xx] Invalid timerOff (0 or 40..65535): %hu", timerOff)
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] AT+SLEDS=%hhu,%hu,%hu", mode, timerOn, timerOff)
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+SLEDS=%hhu,%hu,%hu", mode, timerOn, timerOff)
+  
+    MS_TINY_GSM_SEM_TAKE_WAIT("setNetlightTimerPeriod")
+
     thisModem().sendAT(GF("+SLEDS="), mode, GF(","), timerOn, GF(","), timerOff);
     int8_t ret = thisModem().waitResponse(2000L);
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    
+    DBGLOG(Info, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
     return ret == 1;
   } // TinyGsmSim70xx.setNetlightTimerPeriod
 
@@ -581,12 +592,18 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   //              
   **/
   bool setNetlightOn(uint8_t mode) {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
+    DBGLOG(Info, "[TinyGsmSim70xx] >>")
     DBGCHK(Warn, (mode >= 0) && (mode <= 1), "[TinyGsmSim70xx] Invalid mode: %hhu", mode)
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] AT+CNETLIGHT=%hhu", mode)
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+CNETLIGHT=%hhu", mode)
+  
+    MS_TINY_GSM_SEM_TAKE_WAIT("setNetlightOn")
+
     thisModem().sendAT(GF("+CNETLIGHT="), mode);
     int8_t ret = thisModem().waitResponse(2000L);
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    
+    DBGLOG(Info, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
     return ret == 1;
   } // TinyGsmSim70xx.setNetlightOn
 
@@ -594,22 +611,26 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   // <MS>
   /**
   // @brief       Sets behaviour of netlight-led (AT-CSGS).
-  // @param       mode      0-off, 1-on.
-  // @param       timerOn   duration (0-65535ms) led is on.
-  // @param       timerOff  duration (0-65535ms) led is off.
+  // @param       mode      0-disable, 1-default/standard, 2-individual, as set by +SLEDS/setNetlightTimerPeriod.
   // @return      true = okay
   // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
   //              
   **/
   bool setNetlightIndication(uint8_t mode) {
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] >>")
+    DBGLOG(Info, "[TinyGsmSim70xx] >>")
     DBGCHK(Warn, (mode >= 0) && (mode <= 2), "[TinyGsmSim70xx] Invalid mode: %hhu", mode)
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] AT+CSGS=%hhu", mode)
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+CSGS=%hhu", mode)
+  
+    MS_TINY_GSM_SEM_TAKE_WAIT("setNetlightIndication")
+
     thisModem().sendAT(GF("+CSGS="), mode);
     int8_t ret = thisModem().waitResponse(2000L);
-    DBGLOG(msTinyGsmLogLevel, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    
+    DBGLOG(Info, "[TinyGsmSim70xx] << return: %s (ret: %hhi)", DBGB2S(ret == 1), ret)
     return ret == 1;
-  } // TinyGsmSim70xx.setNetlightOn
+  } // TinyGsmSim70xx.setNetlightIndication
 
  public:
   Stream& stream;
