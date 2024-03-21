@@ -21,6 +21,18 @@
 #include "TinyGsmTCP.tpp"
 #include "TinyGsmSSL.tpp"
 
+
+#ifdef MS_TINYGSM_LOGGING
+#define ESP32DEBUGGING 
+#undef MS_LOGGER_LEVEL
+#define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
+#else
+#undef ESP32DEBUGGING
+#endif
+#include "ESP32Logger.h"
+
+
+
 class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
                        public TinyGsmTCP<TinyGsmSim7080, TINY_GSM_MUX_COUNT>,
                        public TinyGsmSSL<TinyGsmSim7080> {
