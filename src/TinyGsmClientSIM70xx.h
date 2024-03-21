@@ -19,6 +19,18 @@
 #include "TinyGsmNTP.tpp"
 #include "TinyGsmGSMLocation.tpp"
 
+
+#ifdef MS_TINYGSM_LOGGING
+#define ESP32DEBUGGING 
+#undef MS_LOGGER_LEVEL
+#define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
+#else
+#undef ESP32DEBUGGING
+#endif
+#include "ESP32Logger.h"
+
+
+
 #define GSM_NL "\r\n"
 static const char GSM_OK[] TINY_GSM_PROGMEM    = "OK" GSM_NL;
 static const char GSM_ERROR[] TINY_GSM_PROGMEM = "ERROR" GSM_NL;
@@ -514,10 +526,9 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
 
   // <MS>
   /**
-  // @brief       Logs actual settings of AT-SLEDS, AT-CNETLIGHT, AT-CSGS.
+  // @brief       Logs actual settings of AT+SLEDS, AT+CNETLIGHT, AT+CSGS.
   // @return      true = okay
   // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
-  //              
   **/
   bool reportNetlightStatus() {
   
@@ -555,14 +566,13 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
 
   // <MS>
   /**
-  // @brief       Sets behaviour of netlight-led (AT-SLEDS).
+  // @brief       Sets behaviour of netlight-led (AT+SLEDS).
   // @param       mode      1-not registered (e.g. no sim), 2-registered to net, 3-connected.
   // @param       timerOn   duration (0-65535ms) led is on.
   // @param       timerOff  duration (0-65535ms) led is off.
   // @return      true = okay
   // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
   // @note        Will only be effective if activated with setNetlightIndication(2).
-  //              
   **/
   bool setNetlightTimerPeriod(uint8_t mode, uint16_t timerOn, uint16_t timerOff) {
     DBGLOG(Info, "[TinyGsmSim70xx] >>")
@@ -585,11 +595,10 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
 
   // <MS>
   /**
-  // @brief       Turns netlight-led on and off (AT-CNETLIGHT).
+  // @brief       Turns netlight-led on and off (AT+CNETLIGHT).
   // @param       mode      0-off, 1-on.
   // @return      true = okay
   // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
-  //              
   **/
   bool setNetlightOn(uint8_t mode) {
     DBGLOG(Info, "[TinyGsmSim70xx] >>")
@@ -610,11 +619,10 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
 
   // <MS>
   /**
-  // @brief       Sets behaviour of netlight-led (AT-CSGS).
+  // @brief       Sets behaviour of netlight-led (AT+CSGS).
   // @param       mode      0-disable, 1-default/standard, 2-individual, as set by +SLEDS/setNetlightTimerPeriod.
   // @return      true = okay
   // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
-  //              
   **/
   bool setNetlightIndication(uint8_t mode) {
     DBGLOG(Info, "[TinyGsmSim70xx] >>")
@@ -632,11 +640,36 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
     return ret == 1;
   } // TinyGsmSim70xx.setNetlightIndication
 
+  // <MS>
+  /**
+  // @brief       RequestTA Revision Identification of Software Release (AT+CGMR).
+  // @return      Software Release Identification, or empty "" if failed.
+  // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
+  **/
+  String getModemRevisionSoftwareRelease() {
+    thisModem().sendAT(GF("+CGMR"));
+    String res;
+    if (thisModem().waitResponse(1000L, res) != 1) { return ""; }
+    // Do the replaces twice so we cover both \r and \r\n type endings
+    res.replace("\r\nOK\r\n", "");
+    res.replace("\rOK\r", "");
+    res.replace("\r\n", " ");
+    res.replace("\r", " ");
+    // <MS> Additionally:
+    res.replace("OK", "");
+    res.replace("/", "");
+    res.replace("Revision:", "");
+    res.trim();
+    return res;
+  } // TinyGsmSim70xx.getModemRevisionSoftwareRelease
+
+
  public:
   Stream& stream;
 
  protected:
   const char* gsmNL = GSM_NL;
 };
+
 
 #endif  // SRC_TINYGSMCLIENTSIM70XX_H_
