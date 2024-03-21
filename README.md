@@ -7,6 +7,13 @@ Adjustments in the code for SIM7080G (TinyGsmClientSIM7080.h):
 * Added concept to use of semaphores in the macros MS_TINY_GSM_SEM_xxx to avoid parallel calls/executions of functions when various sockets/mux are used in parallel.
 * Added further debugging-messages to understand and check the existing code (but it is possible that in some cases output of debugging effects the functionallity itself).
 
+New functions (TinyGsmClientSIM70xx.h):
+* bool reportNetlightStatus()
+* bool setNetlightTimerPeriod(uint8_t mode, uint16_t timerOn, uint16_t timerOff)
+* bool setNetlightOn(uint8_t mode)
+* bool setNetlightIndication(uint8_t mode)
+* String getModemRevisionSoftwareRelease()
+
 Tested with SIM7080G (R1951.04) with ESP32 with two connections in parallel:
 * Socket 0 connected with Google-Firebase and doing data-uptades every minute on Firebase-RTDB, meanwhile
 * Socket 1 doing the download of an OTA-update (1.7 MByte) over about 8 minutes.
