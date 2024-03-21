@@ -172,6 +172,9 @@ class TinyGsmModem {
     res.replace("\rOK\r", "");
     res.replace("\r\n", " ");
     res.replace("\r", " ");
+    // <MS> Additionally:
+    res.replace("OK", "");
+    res.replace("/", "");
     res.trim();
     return res;
   }
@@ -182,6 +185,9 @@ class TinyGsmModem {
     if (thisModem().waitResponse(1000L, res1) != 1) { return "unknown"; }
     res1.replace("\r\nOK\r\n", "");
     res1.replace("\rOK\r", "");
+    // <MS> Additionally:
+    res1.replace("OK", "");
+    res1.replace("/", "");
     res1.trim();
 
     thisModem().sendAT(GF("+GMM"));
@@ -189,6 +195,9 @@ class TinyGsmModem {
     if (thisModem().waitResponse(1000L, res2) != 1) { return "unknown"; }
     res2.replace("\r\nOK\r\n", "");
     res2.replace("\rOK\r", "");
+    // <MS> Additionally:
+    res2.replace("OK", "");
+    res2.replace("/", "");
     res2.trim();
 
     String name = res1 + String(' ') + res2;
