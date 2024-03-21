@@ -21,9 +21,8 @@
 
 #ifdef MS_TINYGSM_LOGGING
 #define ESP32DEBUGGING 
-#ifndef MS_LOGGER_LEVEL
+#undef MS_LOGGER_LEVEL
 #define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
-#endif
 #else
 #undef ESP32DEBUGGING
 #endif
