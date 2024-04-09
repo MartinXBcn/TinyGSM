@@ -296,11 +296,17 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   bool getNetworkSystemMode(bool& n, int16_t& stat) {
     // n: whether to automatically report the system mode info
     // stat: the current service. 0 if it not connected
+
+    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkSystemMode")
+
     thisModem().sendAT(GF("+CNSMOD?"));
     if (thisModem().waitResponse(GF(GSM_NL "+CNSMOD:")) != 1) { return false; }
     n    = thisModem().streamGetIntBefore(',') != 0;
     stat = thisModem().streamGetIntBefore('\n');
     thisModem().waitResponse();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    
     return true;
   }
 
@@ -647,9 +653,15 @@ class TinyGsmSim70xx : public TinyGsmModem<TinyGsmSim70xx<modemType>>,
   // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
   **/
   String getModemRevisionSoftwareRelease() {
+  
+    MS_TINY_GSM_SEM_TAKE_WAIT("getModemRevisionSoftwareRelease")
+
     thisModem().sendAT(GF("+CGMR"));
     String res;
     if (thisModem().waitResponse(1000L, res) != 1) { return ""; }
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    
     // Do the replaces twice so we cover both \r and \r\n type endings
     res.replace("\r\nOK\r\n", "");
     res.replace("\rOK\r", "");
