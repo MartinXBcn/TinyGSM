@@ -20,15 +20,28 @@
 #include "TinyGsmGSMLocation.tpp"
 
 
+// Logging
+#ifndef MS_TINYGSM_LOGGING
+#if defined(CONFIG_MS_TINYGSM_LOGGING_ERROR)
+#define MS_TINYGSM_LOGGING Error
+#elif defined(CONFIG_MS_TINYGSM_LOGGING_WARN)
+#define MS_TINYGSM_LOGGING Warn
+#elif defined(CONFIG_MS_TINYGSM_LOGGING_INFO)
+#define MS_TINYGSM_LOGGING Info
+#elif defined(CONFIG_MS_TINYGSM_LOGGING_DEBUG)
+#define MS_TINYGSM_LOGGING Debug
+#elif defined(CONFIG_MS_TINYGSM_LOGGING_VERBOSE)
+#define MS_TINYGSM_LOGGING Verbose
+#endif
+#endif
 #ifdef MS_TINYGSM_LOGGING
-#define ESP32DEBUGGING 
+#define ESP32DEBUGGING
 #undef MS_LOGGER_LEVEL
 #define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
 #else
 #undef ESP32DEBUGGING
 #endif
 #include "ESP32Logger.h"
-
 
 
 #define GSM_NL "\r\n"

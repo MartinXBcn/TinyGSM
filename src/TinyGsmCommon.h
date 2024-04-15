@@ -16,11 +16,25 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240022800
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240041500
 
 
+// Logging
+#ifndef MS_TINYGSM_LOGGING
+#if defined(CONFIG_MS_TINYGSM_LOGGING_ERROR)
+#define MS_TINYGSM_LOGGING Error
+#elif defined(CONFIG_MS_TINYGSM_LOGGING_WARN)
+#define MS_TINYGSM_LOGGING Warn
+#elif defined(CONFIG_MS_TINYGSM_LOGGING_INFO)
+#define MS_TINYGSM_LOGGING Info
+#elif defined(CONFIG_MS_TINYGSM_LOGGING_DEBUG)
+#define MS_TINYGSM_LOGGING Debug
+#elif defined(CONFIG_MS_TINYGSM_LOGGING_VERBOSE)
+#define MS_TINYGSM_LOGGING Verbose
+#endif
+#endif
 #ifdef MS_TINYGSM_LOGGING
-#define ESP32DEBUGGING 
+#define ESP32DEBUGGING
 #undef MS_LOGGER_LEVEL
 #define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
 #else
