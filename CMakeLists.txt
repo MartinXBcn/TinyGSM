@@ -18,6 +18,7 @@ idf_component_register(
     REQUIRES 
         arduino 
         ms_Logger
+        ms_General
     )
 
 message(INFO "<MS>")
