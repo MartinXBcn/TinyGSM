@@ -16,7 +16,7 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240041500
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240041600
 
 
 // Logging
@@ -119,7 +119,11 @@ DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
 #endif
 
 #ifndef TINY_GSM_YIELD_MS
+#ifdef CONFIG_TINY_GSM_YIELD_MS
+#define TINY_GSM_YIELD_MS CONFIG_TINY_GSM_YIELD_MS
+#else
 #define TINY_GSM_YIELD_MS 0
+#endif
 #endif
 
 #ifndef TINY_GSM_YIELD
