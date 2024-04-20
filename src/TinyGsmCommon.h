@@ -16,23 +16,10 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240041600
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240042000
 
 
 // Logging
-#ifndef MS_TINYGSM_LOGGING
-#if defined(CONFIG_MS_TINYGSM_LOGGING_ERROR)
-#define MS_TINYGSM_LOGGING Error
-#elif defined(CONFIG_MS_TINYGSM_LOGGING_WARN)
-#define MS_TINYGSM_LOGGING Warn
-#elif defined(CONFIG_MS_TINYGSM_LOGGING_INFO)
-#define MS_TINYGSM_LOGGING Info
-#elif defined(CONFIG_MS_TINYGSM_LOGGING_DEBUG)
-#define MS_TINYGSM_LOGGING Debug
-#elif defined(CONFIG_MS_TINYGSM_LOGGING_VERBOSE)
-#define MS_TINYGSM_LOGGING Verbose
-#endif
-#endif
 #ifdef MS_TINYGSM_LOGGING
 #define ESP32DEBUGGING
 #undef MS_LOGGER_LEVEL
@@ -116,14 +103,6 @@ DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
 #include <ArduinoCompat/Client.h>
 #else
 #include <Client.h>
-#endif
-
-#ifndef TINY_GSM_YIELD_MS
-#ifdef CONFIG_TINY_GSM_YIELD_MS
-#define TINY_GSM_YIELD_MS CONFIG_TINY_GSM_YIELD_MS
-#else
-#define TINY_GSM_YIELD_MS 0
-#endif
 #endif
 
 #ifndef TINY_GSM_YIELD
