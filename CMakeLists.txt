@@ -1,10 +1,5 @@
 
-
-message(INFO "<MS>")
-message(INFO "<MS> TinyGSM >>")
-message(INFO "<MS>")
 message(INFO "<MS> CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-
 
 set(TinyGSM_SRCS 
     src/TinyGsmModem.tpp
@@ -20,7 +15,3 @@ idf_component_register(
         ms_Logger
         ms_General
     )
-
-message(INFO "<MS>")
-message(INFO "<MS> TinyGSM <<")
-message(INFO "<MS>")
