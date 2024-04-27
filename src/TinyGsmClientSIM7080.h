@@ -186,9 +186,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         certificates() {
     DBGLOG(Info, "[TinyGsmSim7080] >>");
     memset(sockets, 0, sizeof(sockets));
-
     msTinyGsmSemCriticalProcess = xSemaphoreCreateMutex();
-    if (msTinyGsmSemCriticalProcess == NULL) DBGLOG(Error, "[TinyGsmSim7080] CRITICAL ERROR msTinyGsmSemCriticalProcess can not be created!");
+    DBGCHK(Error, msTinyGsmSemCriticalProcess != NULL, "[TinyGsmSim7080] CRITICAL ERROR msTinyGsmSemCriticalProcess can not be created!");
     DBGLOG(Info, "[TinyGsmSim7080] <<");
   } // TinyGsmSim7080::TinyGsmSim7080(...)
 

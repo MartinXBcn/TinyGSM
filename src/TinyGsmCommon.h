@@ -16,7 +16,7 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240042000
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240042600
 
 
 // Logging
