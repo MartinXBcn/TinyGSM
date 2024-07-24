@@ -201,7 +201,7 @@ class TinyGsmModem {
     res2.trim();
 
     String name = res1 + String(' ') + res2;
-    DBG("### Modem:", name);
+    DBGLOG(Info, "### Modem: %s", name.c_str())
     return name;
   }
 
@@ -392,16 +392,24 @@ class TinyGsmModem {
   }
 
   inline bool streamSkipUntil(const char c, const uint32_t timeout_ms = 1000L) {
+    DBGLOG(Debug, "[TinyGsmModem] >> c: '%c', timeout_ms: %" PRIu32, c, timeout_ms)
+    DBGCOD(int idx = 0;)
     uint32_t startMillis = millis();
     while (millis() - startMillis < timeout_ms) {
       while (millis() - startMillis < timeout_ms &&
              !thisModem().stream.available()) {
         TINY_GSM_YIELD();
       }
-      if (thisModem().stream.read() == c) { return true; }
+      if (thisModem().stream.read() == c) { 
+        DBGLOG(Debug, "[TinyGsmModem] '%c' found at idx: %i", c, idx)
+        DBGLOG(Debug, "[TinyGsmModem] << return: t")
+        return true; 
+      }
+      DBGCOD(idx++;)
     }
+    DBGLOG(Debug, "[TinyGsmModem] << return: f")
     return false;
   }
-};
+}; // class TinyGsmModem
 
 #endif  // SRC_TINYGSMMODEM_H_

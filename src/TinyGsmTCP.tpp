@@ -119,7 +119,7 @@ class TinyGsmTCP {
     }
 
     int available() override {
-      TINY_GSM_YIELD();
+//<MS>      TINY_GSM_YIELD();
 #if defined TINY_GSM_NO_MODEM_BUFFER
       // Returns the number of characters available in the TinyGSM fifo
       if (!rx.size() && sock_connected) { at->maintain(); }

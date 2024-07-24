@@ -23,12 +23,9 @@
 
 
 // Logging
-#ifdef MS_TINYGSM_LOGGING
-#define ESP32DEBUGGING
 #undef MS_LOGGER_LEVEL
+#ifdef MS_TINYGSM_LOGGING
 #define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
-#else
-#undef ESP32DEBUGGING
 #endif
 #include "ESP32Logger.h"
 
@@ -665,6 +662,7 @@ end:
   size_t modemRead(size_t size, uint8_t mux) {
     if (!sockets[mux]) { return 0; }
     DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux);
+    DBGCOD(char* tmp = new char[TINY_GSM_RX_BUFFER]; tmp[0] = '\0';)
 
     MS_TINY_GSM_SEM_TAKE_WAIT("modemRead")
 
@@ -691,7 +689,7 @@ end:
     // characters available, but in tests only the number is returned
 
     len_confirmed = stream.parseInt();
-    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) len_confirmed: %hi", mux, len_confirmed);
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) len_confirmed: %hi", mux, len_confirmed)
     streamSkipUntil(',');  // skip the comma
     if (len_confirmed <= 0) {
       waitResponse();
@@ -700,15 +698,20 @@ end:
       goto end;
     }
 
-    for (int i = 0; i < len_confirmed; i++) {
+    int i;
+    for (i = 0; i < len_confirmed; i++) {
       uint32_t startMillis = millis();
       while (!stream.available() &&
              (millis() - startMillis < sockets[mux]->_timeout)) {
         TINY_GSM_YIELD();
       }
       char c = stream.read();
+      DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) %4i: '%c'", mux, i, c)
+      DBGCOD(tmp[i] = c;)
       sockets[mux]->rx.put(c);
     }
+    DBGCOD(tmp[i] = '\0';)
+    DBGLOG(Debug,"[TinyGsmSim7080] (#%hhu) Read: %hs", mux, tmp)
     waitResponse();
     // make sure the sock available number is accurate again
     sockets[mux]->sock_available = modemGetAvailable(mux);
@@ -718,7 +721,8 @@ end:
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, _size);
+    DBGCOD(delete[] tmp;)
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u,  sock_available: %" PRIu16, mux, _size, sockets[mux]->sock_available);
     return _size;
   } // ::modemRead(...)
 

@@ -16,16 +16,13 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240042600
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240072400
 
 
 // Logging
-#ifdef MS_TINYGSM_LOGGING
-#define ESP32DEBUGGING
 #undef MS_LOGGER_LEVEL
+#ifdef MS_TINYGSM_LOGGING
 #define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
-#else
-#undef ESP32DEBUGGING
 #endif
 #include "ESP32Logger.h"
 
@@ -126,7 +123,7 @@ typedef const char* GsmConstStr;
 #define GF(x) x
 #endif
 
-#ifdef TINY_GSM_DEBUG
+#ifdef TINY_GSM_DEBUGxxx
 namespace {
 template <typename T>
 static void DBG_PLAIN(T last) {
@@ -173,14 +170,16 @@ uint32_t TinyGsmAutoBaud(T& SerialAT, uint32_t minimum = 9600,
     uint32_t rate = rates[i];
     if (rate < minimum || rate > maximum) continue;
 
-    DBG("Trying baud rate", rate, "...");
+//    DBG("Trying baud rate", rate, "...");
+    DBGLOG(Info, "Trying baud rate %" PRIu32, rate, "...")
     SerialAT.begin(rate);
     delay(10);
     for (int j = 0; j < 10; j++) {
       SerialAT.print("AT\r\n");
       String input = SerialAT.readString();
       if (input.indexOf("OK") >= 0) {
-        DBG("Modem responded at rate", rate);
+//        DBG("Modem responded at rate", rate);
+        DBGLOG(Info, "Modem responded at rate %" PRIu32, rate)
         return rate;
       }
     }
