@@ -29,8 +29,8 @@
 
 extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 
-#define logLevelSemTinyGsmInfo Debug
-//#define logLevelSemTinyGsmInfo Info
+//#define logLevelSemTinyGsmInfo Debug
+#define logLevelSemTinyGsmInfo Info
 #define logLevelSemTinyGsmWarn Warn
 //#define logLevelSemTinyGsmWarn Debug
 

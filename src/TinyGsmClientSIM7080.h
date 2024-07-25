@@ -706,7 +706,7 @@ end:
         TINY_GSM_YIELD();
       }
       char c = stream.read();
-      DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) %4i: '%c'", mux, i, c)
+//      DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) %4i: '%c'", mux, i, (c < 32 || c > 126) ? 'X' : c)
       DBGCOD(tmp[i] = c;)
       sockets[mux]->rx.put(c);
     }
@@ -1006,7 +1006,7 @@ end:
     }
     data.replace(GSM_NL, "/");
     // DBG('<', index, '>', data);
-/*
+/**/
 #if defined TINY_GSM_DEBUG
 //    if (index != 1) {
       String r1s(r1); r1s.trim();
@@ -1025,7 +1025,7 @@ end:
       DBGLOG(Info, "[TinyGsmSim7080]-%i Return data: %s, return index: %hhu", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str(), index)
 //    }
 #endif
-*/
+
     DBGLOG(Debug, "[TinyGsmSim7080]-%i << return index: %hhu", msCallLevelWaitResponse, index)
     msCallLevelWaitResponse--;
 
