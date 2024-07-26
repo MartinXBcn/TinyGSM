@@ -391,8 +391,9 @@ class TinyGsmModem {
     return -9999.0F;
   }
 
+  #define DBGLVL_STREAMSKIPUNTIL Verbose
   inline bool streamSkipUntil(const char c, const uint32_t timeout_ms = 1000L) {
-    DBGLOG(Debug, "[TinyGsmModem] >> c: '%c', timeout_ms: %" PRIu32, c, timeout_ms)
+    DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] >> c: '%c', timeout_ms: %" PRIu32, c, timeout_ms)
     DBGCOD(int idx = 0;)
     uint32_t startMillis = millis();
     while (millis() - startMillis < timeout_ms) {
@@ -401,13 +402,13 @@ class TinyGsmModem {
         TINY_GSM_YIELD();
       }
       if (thisModem().stream.read() == c) { 
-        DBGLOG(Debug, "[TinyGsmModem] '%c' found at idx: %i", c, idx)
-        DBGLOG(Debug, "[TinyGsmModem] << return: t")
+        DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] '%c' found at idx: %i", c, idx)
+        DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] << return: t")
         return true; 
       }
       DBGCOD(idx++;)
     }
-    DBGLOG(Debug, "[TinyGsmModem] << return: f")
+    DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] << return: f")
     return false;
   }
 }; // class TinyGsmModem

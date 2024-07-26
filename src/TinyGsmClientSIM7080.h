@@ -230,11 +230,18 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 
     // Enable battery checks
+
+
 // <MS>
-//    sendAT(GF("+CBATCHK=1"));
+
+
+    sendAT(GF("+CBATCHK=1"));
+
     // Disable battery checks
-    sendAT(GF("+CBATCHK=0"));
+//    sendAT(GF("+CBATCHK=0"));
 // <MS>
+
+
     if (waitResponse() != 1) { 
       DBGLOG(Error, "[TinyGsmSim7080] Disable-bat-checks failed! Stop.")
       r = false; 
@@ -268,7 +275,8 @@ endx:
     // sockets asking if any data is avaiable
 //    DBGLOG(Info, "[TinyGsmSim7080::maintainImpl] >>");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("maintainImpl")
+    // MS_TINY_GSM_SEM_TAKE_WAIT("maintainImpl")
+    xSemaphoreTake(msTinyGsmSemCriticalProcess, portMAX_DELAY);
 
     bool check_socks = false;
     for (int mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
@@ -289,7 +297,8 @@ endx:
 
     while (stream.available()) { waitResponse(15, NULL, NULL); }
 
-    MS_TINY_GSM_SEM_GIVE_WAIT
+    // MS_TINY_GSM_SEM_GIVE_WAIT
+    xSemaphoreGive(msTinyGsmSemCriticalProcess); 
 
 //    DBGLOG(Info, "[TinyGsmSim7080::maintainImpl] <<");
   } // TinyGsmSim7080::maintainImpl()
@@ -668,6 +677,13 @@ end:
 
     int16_t len_confirmed;
     size_t _size = size;
+    int i;
+    uint32_t startMillis;
+/*
+    const unsigned long ms_timeout = 100;
+    uint32_t ms_startMillisDelay;
+*/
+//    const unsigned long timeout = 60 * 1000;
 
     sendAT(GF("+CARECV="), mux, ',', (uint16_t)size);
 
@@ -698,18 +714,41 @@ end:
       goto end;
     }
 
-    int i;
+//    ms_startMillisDelay = millis();
+//    for (i = 0; (i < len_confirmed) && (startMillis + sockets[mux]->_timeout < millis()); i++) {
+//    for (i = 0; (i < len_confirmed) && (startMillis + timeout < millis()); i++) {
+
     for (i = 0; i < len_confirmed; i++) {
-      uint32_t startMillis = millis();
+      startMillis = millis();
       while (!stream.available() &&
              (millis() - startMillis < sockets[mux]->_timeout)) {
         TINY_GSM_YIELD();
       }
+
+/*
+      while (!stream.available() &&
+
+//             (millis() - startMillis < sockets[mux]->_timeout)) {
+             (millis() - ms_startMillisDelay < ms_timeout)) 
+      {
+          delay(10);
+          DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) waiting for data (i=%i)", mux, i)
+          ms_startMillisDelay = millis();
+//        TINY_GSM_YIELD();
+      }
+      if (millis() - ms_startMillisDelay < ms_timeout) { 
+          delay(10);
+          DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) still reading data (i=%i)", mux, i)
+          ms_startMillisDelay = millis();
+      }
+*/      
       char c = stream.read();
-//      DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) %4i: '%c'", mux, i, (c < 32 || c > 126) ? 'X' : c)
+      DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) %4i: '%c'", mux, i, (c < 32 || c > 126) ? 'X' : c)
       DBGCOD(tmp[i] = c;)
       sockets[mux]->rx.put(c);
+//      startMillis = millis();
     }
+//    DBGCHK(Error, i == len_confirmed, "[TinyGsmSim7080] ERROR: i(%i) != len_confirmed(%" PRIi16 "), i.e. time-out.", i, len_confirmed)
     DBGCOD(tmp[i] = '\0';)
     DBGLOG(Debug,"[TinyGsmSim7080] (#%hhu) Read: %hs", mux, tmp)
     waitResponse();
@@ -889,6 +928,10 @@ end:
  public:
   // TODO(vshymanskyy): Optimize this!
 
+
+  #define dbglvlmsg Error
+
+
   int msCallLevelWaitResponse = 0;
   int8_t waitResponse(uint32_t timeout_ms, String& data,
                       GsmConstStr r1 = GFP(GSM_OK),
@@ -907,10 +950,33 @@ end:
     data.reserve(64);
     uint8_t  index       = 0;
     uint32_t startMillis = millis();
+
+//    const unsigned long ms_timeout = 300;
+//    uint32_t ms_startMillisDelay = millis();
+
     do {
+
+//
       TINY_GSM_YIELD();
+/*
+      if (millis() - ms_timeout > ms_startMillisDelay) { 
+          delay(10);
+          DBGLOG(Debug, "[TinyGsmSim7080] time-out-1")
+          ms_startMillisDelay = millis();
+      }
+*/      
       while (stream.available() > 0) {
+
+//
+//
         TINY_GSM_YIELD();
+/*        
+        if (millis() - ms_timeout > ms_startMillisDelay) { 
+            delay(10);
+            DBGLOG(Debug, "[TinyGsmSim7080] time-out-2")
+            ms_startMillisDelay = millis();
+        }
+*/
         int8_t a = stream.read();
         if (a <= 0) continue;  // Skip 0x00 bytes, just in case
         data += static_cast<char>(a);
@@ -953,55 +1019,77 @@ end:
 // <MS>            
           }
           data = "";
-          DBGLOG(Info, "[TinyGsmSim7080]-%i Got Data: %hi on mux: %hhi", msCallLevelWaitResponse, len, mux);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Got Data: %hi on mux: %hhi", msCallLevelWaitResponse, len, mux)
         } else if (data.endsWith(GF("+CADATAIND:"))) {
           int8_t mux = streamGetIntBefore('\n');
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->got_data = true;
           }
           data = "";
-          DBGLOG(Info, "[TinyGsmSim7080]-%i Got data on mux: %hhi", msCallLevelWaitResponse, mux);
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Got data on mux: %hhi", msCallLevelWaitResponse, mux)
         } else if (data.endsWith(GF("+CASTATE:"))) {
           int8_t mux   = streamGetIntBefore(',');
           int8_t state = streamGetIntBefore('\n');
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             if (state != 1) {
               sockets[mux]->sock_connected = false;
-              DBGLOG(Info, "[TinyGsmSim7080]-%i Closed, mux: %hhi, state: %hhi", msCallLevelWaitResponse, mux, state);
+              DBGLOG(Info, "[TinyGsmSim7080]-%i Closed, mux: %hhi, state: %hhi", msCallLevelWaitResponse, mux, state)
             }
           }
           data = "";
         } else if (data.endsWith(GF("*PSNWID:"))) {
           streamSkipUntil('\n');  // Refresh network name by network
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Network name updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
           data = "";
-          DBGLOG(Info, "[TinyGsmSim7080]-%i Network name updated.", msCallLevelWaitResponse);
         } else if (data.endsWith(GF("*PSUTTZ:"))) {
           streamSkipUntil('\n');  // Refresh time and time zone by network
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Network time and time zone updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
           data = "";
-          DBGLOG(Info, "[TinyGsmSim7080]-%i Network time and time zone updated.", msCallLevelWaitResponse);
         } else if (data.endsWith(GF("+CTZV:"))) {
           streamSkipUntil('\n');  // Refresh network time zone by network
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Network time zone updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
           data = "";
-          DBGLOG(Info, "[TinyGsmSim7080]-%i Network time zone updated.", msCallLevelWaitResponse);
         } else if (data.endsWith(GF("DST: "))) {
-          streamSkipUntil(
-              '\n');  // Refresh Network Daylight Saving Time by network
+          streamSkipUntil('\n');  // Refresh Network Daylight Saving Time by network
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Daylight savings time state updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
           data = "";
-          DBGLOG(Info, "[TinyGsmSim7080]-%i Daylight savings time state updated.", msCallLevelWaitResponse);
         } else if (data.endsWith(GF(GSM_NL "SMS Ready" GSM_NL))) {
+          DBGLOG(Error, "[TinyGsmSim7080]-%i Unexpected module reset: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
           data = "";
-          DBGLOG(Error, "[TinyGsmSim7080]-%i Unexpected module reset!", msCallLevelWaitResponse);
 // <MS>          
 //          init();
 // <MS>          
           data = "";
+        } else if (data.indexOf(GF("VOLTAGE")) >= 0) {
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Voltage-message: %s.", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
+          data = "";
+        } else {
+          String tmp = data;
+          tmp.replace(GSM_NL, "/");
+          tmp.trim();
+          if ((tmp.length() > 10) && 
+              (tmp.indexOf(GF("CNACT")) < 0) && 
+              (tmp.indexOf(GF("SLEDS")) < 0) && 
+              (tmp.indexOf(GF("CNET")) < 0) && 
+              (tmp.indexOf(GF("CSGS")) < 0) && 
+              (tmp.indexOf(GF("CGNAP")) < 0) && 
+              (tmp.indexOf(GF("CLTS")) < 0) )
+            {
+            DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Unknown message: '%s' (%s)", 
+              msCallLevelWaitResponse, asCharString(tmp.c_str(), 0, tmp.length()).c_str(), asHexString(tmp.c_str(), 0, tmp.length()).c_str())
+          }
         }
       }
     } while (millis() - startMillis < timeout_ms);
   finish:
     if (!index) {
       data.trim();
-      if (data.length()) { DBGLOG(Warn, "[TinyGsmSim7080]-%i Unhandled: %s", msCallLevelWaitResponse, data.c_str()); }
+      if (data.length()) { 
+        DBGLOG(Warn, "[TinyGsmSim7080]-%i Unhandled: '%s' (%s)", 
+          msCallLevelWaitResponse, 
+          asCharString(data.c_str(), 0, data.length()).c_str(), 
+          asHexString(data.c_str(), 0, data.length()).c_str() )
+        }
       data = "";
     }
     data.replace(GSM_NL, "/");
