@@ -11,40 +11,213 @@
 
 #include "TinyGsmCommon.h"
 
+#ifndef AT_NL
+#define AT_NL "\r\n"
+#endif
+
+#ifndef AT_OK
+#define AT_OK "OK"
+#endif
+
+#ifndef AT_ERROR
+#define AT_ERROR "ERROR"
+#endif
+
+#if defined TINY_GSM_DEBUG
+#ifndef AT_VERBOSE
+#define AT_VERBOSE "+CME ERROR:"
+#endif
+
+#ifndef AT_VERBOSE_2
+#define AT_VERBOSE_2 "+CMS ERROR:"
+#endif
+#endif
+
+#ifndef MODEM_MANUFACTURER
+#define MODEM_MANUFACTURER "unknown"
+#endif
+
+#ifndef MODEM_MODEL
+#define MODEM_MODEL "unknown"
+#endif
+
+static const char GSM_OK[] TINY_GSM_PROGMEM    = AT_OK AT_NL;
+static const char GSM_ERROR[] TINY_GSM_PROGMEM = AT_ERROR AT_NL;
+
+#if defined       TINY_GSM_DEBUG
+static const char GSM_VERBOSE[] TINY_GSM_PROGMEM   = AT_VERBOSE;
+static const char GSM_VERBOSE_2[] TINY_GSM_PROGMEM = AT_VERBOSE_2;
+#endif
+
 template <class modemType>
 class TinyGsmModem {
- public:
+  /* =========================================== */
+  /* =========================================== */
   /*
-   * Basic functions
+   * Define the interface
    */
-  bool begin(const char* pin = NULL) {
+ public:
+  /**
+   * @anchor basic_functions
+   * @name Basic functions
+   */
+  /**@{*/
+
+  /**
+   * @brief Sets up the GSM module
+   *
+   * @param pin A pin code to unlock the SIM, if necessary
+   *
+   * @return *true* The module was set up as expected
+   * @return *false* Something failed in module set up
+   */
+  bool begin(const char* pin = nullptr) {
     return thisModem().initImpl(pin);
   }
-  bool init(const char* pin = NULL) {
+  /**
+   * @copydoc TinyGsmModem::begin()
+   */
+  bool init(const char* pin = nullptr) {
     return thisModem().initImpl(pin);
   }
+
+  /**
+   * @brief Recursive variadic template to send AT commands
+   *
+   * @tparam Args
+   * @param cmd The commands to send
+   */
   template <typename... Args>
   inline void sendAT(Args... cmd) {
-    thisModem().streamWrite("AT", cmd..., thisModem().gsmNL);
+    thisModem().streamWrite("AT", cmd..., AT_NL);
     thisModem().stream.flush();
     TINY_GSM_YIELD(); /* DBG("### AT:", cmd...); */
   }
-  void setBaud(uint32_t baud) {
+
+  /**
+   * @brief Set the module baud rate
+   *
+   * @param baud The baud rate the use
+   *
+   * @note After setting and applying the new baud rate, you will have to end()
+   * and begin() the serial object.
+   */
+  bool setBaud(uint32_t baud) {
+    bool b;
 
     MS_TINY_GSM_SEM_TAKE_WAIT("setBaud")
 
-    thisModem().setBaudImpl(baud);
+    b = thisModem().setBaudImpl(baud);
 
     MS_TINY_GSM_SEM_GIVE_WAIT
 
+    return b;
   }
-  // Test response to AT commands
+
+  /**
+   * @brief Test response to AT commands
+   *
+   * @param timeout_ms The the amount of time to test for; optional with a
+   * default value of 10s.
+   * @return *true*  The module responeded to AT commands
+   * @return *false*  The module failed to respond
+   */
   bool testAT(uint32_t timeout_ms = 10000L) {
     return thisModem().testATImpl(timeout_ms);
   }
 
-  // Asks for modem information via the V.25TER standard ATI command
-  // NOTE:  The actual value and style of the response is quite varied
+  /**
+   * @brief Listen for responses to commands and handle URCs
+   *
+   * @param timeout_ms The time to wait for a response
+   * @param data A string of data to fill in with response results
+   * @param r1 The first output to test against, optional with a default value
+   * of "OK"
+   * @param r2 The second output to test against, optional with a default value
+   * of "ERROR"
+   * @param r3 The third output to test against, optional with a default value
+   * of NULL
+   * @param r4 The fourth output to test against, optional with a default value
+   * of NULL
+   * @param r5 The fifth output to test against, optional with a default value
+   * of NULL
+   * @param r6 The sixth output to test against, optional with a default value
+   * of NULL
+   * @param r7 The seventh output to test against, optional with a default value
+   * of NULL
+   * @return *int8_t* the index of the response input
+   */
+  int8_t waitResponse(uint32_t timeout_ms, String& data,
+                      GsmConstStr r1 = GFP(GSM_OK),
+                      GsmConstStr r2 = GFP(GSM_ERROR), GsmConstStr r3 = nullptr,
+                      GsmConstStr r4 = nullptr, GsmConstStr r5 = nullptr,
+                      GsmConstStr r6 = nullptr, GsmConstStr r7 = nullptr) {
+    return thisModem().waitResponseImpl(timeout_ms, data, r1, r2, r3, r4, r5,
+                                        r6, r7);
+  }
+
+  /**
+   * @brief Listen for responses to commands and handle URCs
+   *
+   * @param timeout_ms The time to wait for a response
+   * @param r1 The first output to test against, optional with a default value
+   * of "OK"
+   * @param r2 The second output to test against, optional with a default value
+   * of "ERROR"
+   * @param r3 The third output to test against, optional with a default value
+   * of NULL
+   * @param r4 The fourth output to test against, optional with a default value
+   * of NULL
+   * @param r5 The fifth output to test against, optional with a default value
+   * of NULL
+   * @param r6 The sixth output to test against, optional with a default value
+   * of NULL
+   * @param r7 The seventh output to test against, optional with a default value
+   * of NULL
+   * @return *int8_t* the index of the response input
+   */
+  int8_t waitResponse(uint32_t timeout_ms, GsmConstStr r1 = GFP(GSM_OK),
+                      GsmConstStr r2 = GFP(GSM_ERROR), GsmConstStr r3 = nullptr,
+                      GsmConstStr r4 = nullptr, GsmConstStr r5 = nullptr,
+                      GsmConstStr r6 = nullptr, GsmConstStr r7 = nullptr) {
+    String data;
+    return waitResponse(timeout_ms, data, r1, r2, r3, r4, r5, r6, r7);
+  }
+
+  /**
+   * @brief Listen for responses to commands and handle URCs; listening for 1
+   * second.
+   *
+   * @param r1 The first output to test against, optional with a default value
+   * of "OK"
+   * @param r2 The second output to test against, optional with a default value
+   * of "ERROR"
+   * @param r3 The third output to test against, optional with a default value
+   * of NULL
+   * @param r4 The fourth output to test against, optional with a default value
+   * of NULL
+   * @param r5 The fifth output to test against, optional with a default value
+   * of NULL
+   * @param r6 The sixth output to test against, optional with a default value
+   * of NULL
+   * @param r7 The seventh output to test against, optional with a default value
+   * of NULL
+   * @return *int8_t* the index of the response input
+   */
+  int8_t waitResponse(GsmConstStr r1 = GFP(GSM_OK),
+                      GsmConstStr r2 = GFP(GSM_ERROR), GsmConstStr r3 = nullptr,
+                      GsmConstStr r4 = nullptr, GsmConstStr r5 = nullptr,
+                      GsmConstStr r6 = nullptr, GsmConstStr r7 = nullptr) {
+    return waitResponse(1000L, r1, r2, r3, r4, r5, r6, r7);
+  }
+
+  /**
+   * @brief Asks for modem information via the 3GPP TS 27.007 standard ATI
+   * command
+   *
+   * @note  The actual value and style of the response is quite varied
+   * @return *String* Some info about the GSM module.
+   */
   String getModemInfo() {
     String s;
 
@@ -58,7 +231,12 @@ class TinyGsmModem {
   }
   // Gets the modem name (as it calls itself)
 
-
+  /**
+   * @brief Get the modem name - a combination of the manufacturer and model, as
+   * the modem calls itself
+   *
+   * @return *String*  The modem name
+   */
   String getModemName() {
     String s;
 
@@ -71,51 +249,174 @@ class TinyGsmModem {
     return s;
   }
 
+  /**
+   * @brief Get the modem manufacturer
+   *
+   * @return *String* The modem manufacturer
+   */
+  String getModemManufacturer() {
+    return thisModem().getModemManufacturerImpl();
+  }
 
+  /**
+   * @brief Get the modem model
+   *
+   * @return *String* The modem model, as it calls itself
+   */
+  String getModemModel() {
+    return thisModem().getModemModelImpl();
+  }
+
+  /**
+   * @brief Get the modem revision information.
+   *
+   * What is returned as the revision may be either a hardware or a firmware
+   * version or some combination of both.
+   *
+   * @return *String* The modem revision information
+   */
+  String getModemRevision() {
+    return thisModem().getModemRevisionImpl();
+  }
+
+  /**
+   * @brief Get the modem serial number
+   *
+   * @return *String* The modem serial number
+   */
+  String getModemSerialNumber() {
+    return thisModem().getModemSerialNumberImpl();
+  }
+
+  /**
+   * @brief Reset the module to factory defaults.
+   *
+   * This generally restarts the module as well.
+   *
+   * @return *true* The module successfully reset to default.
+   * @return *false* The module failed to reset to default.
+   */
   bool factoryDefault() {
     return thisModem().factoryDefaultImpl();
   }
+  /**@}*/
 
-  /*
-   * Power functions
+  /**
+   * @anchor power_functions
+   * @name Power functions
    */
-  bool restart(const char* pin = NULL) {
+  /**@{*/
+
+  /**
+   * @brief Restart the module
+   *
+   * @param pin A pin code to unlock the SIM, if necessary
+   *
+   * @return *true* The module was successfully restarted.
+   * @return *false* There was an error in restarting the module.
+   */
+  bool restart(const char* pin = nullptr) {
     bool b = false;
 
 // Not necessary, should only be called anyway when any other gsm-function runs in parallel.
-//    MS_TINY_GSM_SEM_TAKE_WAIT("restart")
+    MS_TINY_GSM_SEM_TAKE_WAIT("restart")
 
     b = thisModem().restartImpl(pin);
 
-//    MS_TINY_GSM_SEM_GIVE_WAIT
+    MS_TINY_GSM_SEM_GIVE_WAIT
 
     return b;
   }
+  /**
+   * @brief Power off the module
+   *
+   * @return *true* The module was successfully powered down.
+   * @return *false* There was an error in powering down module.
+   */
   bool poweroff() {
     return thisModem().powerOffImpl();
   }
+  /**
+   * @brief Turn off the module radio
+   *
+   * @return *true* The module radio was successfully turned off.
+   * @return *false* There was an error in turning off the radio.
+   */
   bool radioOff() {
     return thisModem().radioOffImpl();
   }
+
+  /**
+   * @brief Enable sleep on the module.
+   *
+   * For some modules this immediately puts
+   * the module to sleep, for others this sets them to be able to sleep based on
+   * pin levels.
+   *
+   * @param enable True to enable sleep, false to disable
+   * @return *true* Sleep was successfully enabled or disabled
+   * @return *false* There was a problem setting sleep
+   */
   bool sleepEnable(bool enable = true) {
     return thisModem().sleepEnableImpl(enable);
   }
+
+  /**
+   * @brief Set the phone functionality
+   *
+   * @param fun The phone functionality setting. The value and meaning of this
+   * varies by module; check your documentation.
+   * @param reset True to reset the module before changing the functionality.
+   * @return *true* The phone functionalilty was successfully changed.
+   * @return *false* There was a problem changing the functionality.
+   */
   bool setPhoneFunctionality(uint8_t fun, bool reset = false) {
     return thisModem().setPhoneFunctionalityImpl(fun, reset);
   }
+  /**@}*/
 
-  /*
-   * Generic network functions
+  /**
+   * @anchor network_functions
+   * @name Generic Network Functions
    */
+  /**@{*/
+
   // RegStatus getRegistrationStatus() {}
+
+  /**
+   * @brief Confirm whether the module is currently connected to the
+   * GSM/GPRS/LTE network.
+   *
+   * @return *true* The module is connected to the network
+   * @return *false* The module is not connected to the network
+   */
   bool isNetworkConnected() {
     return thisModem().isNetworkConnectedImpl();
   }
-  // Waits for network attachment
+
+  /**
+   * @brief Wait until the module has connected to the network
+   *
+   * @param timeout_ms The time to wait for attachment in milliseconds. Optional
+   * with a default value of 1 minute.
+   * @param check_signal True to alternate between checking for connection and
+   * checking the signal strength.
+   * @return *true* The module is now connected to the network.
+   * @return *false* The module did not connect to the network even after
+   * waiting.
+   */
   bool waitForNetwork(uint32_t timeout_ms = 60000L, bool check_signal = false) {
     return thisModem().waitForNetworkImpl(timeout_ms, check_signal);
   }
-  // Gets signal quality report
+
+  /**
+   * @brief Get the signal quality report
+   *
+   * This is often a "CSQ" value ranging from 0 to 32, but may be an RSSI or a
+   * percent.
+   *
+   * @return *int16_t* The signal quality
+   */
   int16_t getSignalQuality() {
     int16_t i = 0;
 
@@ -127,16 +428,33 @@ class TinyGsmModem {
 
     return i;
   }
+
+  /**
+   * @brief Get the Local IP address assigned to the module by the network as a
+   * String
+   *
+   * @return *String* The local IP address
+   */
   String getLocalIP() {
     return thisModem().getLocalIPImpl();
   }
+
+  /**
+   * @brief Get the Local IP address assigned to the module by the network as an
+   * IPAddress object.
+   *
+   * @return *IPAddress* The local IP address
+   */
   IPAddress localIP() {
     return thisModem().TinyGsmIpFromString(thisModem().getLocalIP());
   }
+  /**@}*/
 
-  /*
-   * CRTP Helper
+  /**
+   * @anchor crtp_helper
+   * @name CRTP Helper
    */
+  /**@{*/
  protected:
   inline const modemType& thisModem() const {
     return static_cast<const modemType&>(*this);
@@ -144,164 +462,15 @@ class TinyGsmModem {
   inline modemType& thisModem() {
     return static_cast<modemType&>(*this);
   }
+  /**@}*/
+  ~TinyGsmModem() {}
 
-  /*
-   * Basic functions
+
+  /**
+   * @anchor modem_utilities
+   * @name Utilities
    */
- protected:
-  void setBaudImpl(uint32_t baud) {
-    thisModem().sendAT(GF("+IPR="), baud);
-    thisModem().waitResponse();
-  }
-
-  bool testATImpl(uint32_t timeout_ms = 10000L) {
-    for (uint32_t start = millis(); millis() - start < timeout_ms;) {
-      thisModem().sendAT(GF(""));
-      if (thisModem().waitResponse(200) == 1) { return true; }
-      delay(100);
-    }
-    return false;
-  }
-
-  String getModemInfoImpl() {
-    thisModem().sendAT(GF("I"));
-    String res;
-    if (thisModem().waitResponse(1000L, res) != 1) { return ""; }
-    // Do the replaces twice so we cover both \r and \r\n type endings
-    res.replace("\r\nOK\r\n", "");
-    res.replace("\rOK\r", "");
-    res.replace("\r\n", " ");
-    res.replace("\r", " ");
-    // <MS> Additionally:
-    res.replace("OK", "");
-    res.replace("/", "");
-    res.trim();
-    return res;
-  }
-
-  String getModemNameImpl() {
-    thisModem().sendAT(GF("+CGMI"));
-    String res1;
-    if (thisModem().waitResponse(1000L, res1) != 1) { return "unknown"; }
-    res1.replace("\r\nOK\r\n", "");
-    res1.replace("\rOK\r", "");
-    // <MS> Additionally:
-    res1.replace("OK", "");
-    res1.replace("/", "");
-    res1.trim();
-
-    thisModem().sendAT(GF("+GMM"));
-    String res2;
-    if (thisModem().waitResponse(1000L, res2) != 1) { return "unknown"; }
-    res2.replace("\r\nOK\r\n", "");
-    res2.replace("\rOK\r", "");
-    // <MS> Additionally:
-    res2.replace("OK", "");
-    res2.replace("/", "");
-    res2.trim();
-
-    String name = res1 + String(' ') + res2;
-    DBGLOG(Info, "### Modem: %s", name.c_str())
-    return name;
-  }
-
-  bool factoryDefaultImpl() {
-    thisModem().sendAT(GF("&FZE0&W"));  // Factory + Reset + Echo Off + Write
-    thisModem().waitResponse();
-    thisModem().sendAT(GF("+IPR=0"));  // Auto-baud
-    thisModem().waitResponse();
-    thisModem().sendAT(GF("&W"));  // Write configuration
-    return thisModem().waitResponse() == 1;
-  }
-
-  /*
-   * Power functions
-   */
- protected:
-  bool radioOffImpl() {
-    if (!thisModem().setPhoneFunctionality(0)) { return false; }
-    delay(3000);
-    return true;
-  }
-
-  bool sleepEnableImpl(bool enable = true) TINY_GSM_ATTR_NOT_IMPLEMENTED;
-
-  bool setPhoneFunctionalityImpl(uint8_t fun, bool reset = false)
-      TINY_GSM_ATTR_NOT_IMPLEMENTED;
-
-  /*
-   * Generic network functions
-   */
- protected:
-  // Gets the modem's registration status via CREG/CGREG/CEREG
-  // CREG = Generic network registration
-  // CGREG = GPRS service registration
-  // CEREG = EPS registration for LTE modules
-  int8_t getRegistrationStatusXREG(const char* regCommand) {
-    thisModem().sendAT('+', regCommand, '?');
-    // check for any of the three for simplicity
-    int8_t resp = thisModem().waitResponse(GF("+CREG:"), GF("+CGREG:"),
-                                           GF("+CEREG:"));
-    if (resp != 1 && resp != 2 && resp != 3) { return -1; }
-    thisModem().streamSkipUntil(','); /* Skip format (0) */
-    int status = thisModem().stream.parseInt();
-    thisModem().waitResponse();
-    return status;
-  }
-
-  bool waitForNetworkImpl(uint32_t timeout_ms   = 60000L,
-                          bool     check_signal = false) {
-    for (uint32_t start = millis(); millis() - start < timeout_ms;) {
-      if (check_signal) { thisModem().getSignalQuality(); }
-      if (thisModem().isNetworkConnected()) { return true; }
-      delay(250);
-    }
-    return false;
-  }
-
-  // Gets signal quality report according to 3GPP TS command AT+CSQ
-  int8_t getSignalQualityImpl() {
-    thisModem().sendAT(GF("+CSQ"));
-    if (thisModem().waitResponse(GF("+CSQ:")) != 1) { return 99; }
-    int8_t res = thisModem().streamGetIntBefore(',');
-    thisModem().waitResponse();
-    return res;
-  }
-
-  String getLocalIPImpl() {
-    DBGLOG(Error, "[TinyGsmModem] Dead code, should not be called!")
-    thisModem().sendAT(GF("+CGPADDR=1"));
-    if (thisModem().waitResponse(GF("+CGPADDR:")) != 1) { return ""; }
-    thisModem().streamSkipUntil(',');  // Skip context id
-    String res = thisModem().stream.readStringUntil('\r');
-    if (thisModem().waitResponse() != 1) { return ""; }
-    return res;
-  }
-
-  static inline IPAddress TinyGsmIpFromString(const String& strIP) {
-    int Parts[4] = {
-        0,
-    };
-    int Part = 0;
-    for (uint8_t i = 0; i < strIP.length(); i++) {
-      char c = strIP[i];
-      if (c == '.') {
-        Part++;
-        if (Part > 3) { return IPAddress(0, 0, 0, 0); }
-        continue;
-      } else if (c >= '0' && c <= '9') {
-        Parts[Part] *= 10;
-        Parts[Part] += c - '0';
-      } else {
-        if (Part == 3) break;
-      }
-    }
-    return IPAddress(Parts[0], Parts[1], Parts[2], Parts[3]);
-  }
-
-  /*
-   Utilities
-   */
+  /**@{*/
  public:
   // Utility templates for writing/skipping characters on a stream
   template <typename T>
@@ -317,7 +486,7 @@ class TinyGsmModem {
 
   inline void streamClear() {
     while (thisModem().stream.available()) {
-      thisModem().waitResponse(50, NULL, NULL);
+      thisModem().waitResponse(50, nullptr, nullptr);
     }
   }
 
@@ -410,6 +579,469 @@ class TinyGsmModem {
     }
     DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] << return: f")
     return false;
+  }
+
+  inline void cleanResponseString(String& res) {
+    // Do the replaces twice so we cover both \r and \r\n type endings
+    res.replace("\r\nOK\r\n", "");
+    res.replace("\rOK\r", "");
+    res.replace("\r\n", " ");
+    res.replace("\r", " ");
+    res.trim();
+  }
+
+  static inline IPAddress TinyGsmIpFromString(const String& strIP) {
+    int Parts[4] = {
+        0,
+    };
+    int Part = 0;
+    for (uint8_t i = 0; i < strIP.length(); i++) {
+      char c = strIP[i];
+      if (c == '.') {
+        Part++;
+        if (Part > 3) { return IPAddress(0, 0, 0, 0); }
+        continue;
+      } else if (c >= '0' && c <= '9') {
+        Parts[Part] *= 10;
+        Parts[Part] += c - '0';
+      } else {
+        if (Part == 3) break;
+      }
+    }
+    return IPAddress(Parts[0], Parts[1], Parts[2], Parts[3]);
+  }
+  /**@}*/
+
+  /* =========================================== */
+  /* =========================================== */
+  /*
+   * Define the default function implementations
+   */
+
+  /*
+   * Basic functions
+   */
+ protected:
+  bool initImpl() TINY_GSM_ATTR_NOT_IMPLEMENTED;
+
+  bool setBaudImpl(uint32_t baud) {
+    thisModem().sendAT(GF("+IPR="), baud);
+    return thisModem().waitResponse() == 1;
+  }
+
+  bool testATImpl(uint32_t timeout_ms = 10000L) {
+    for (uint32_t start = millis(); millis() - start < timeout_ms;) {
+      thisModem().sendAT(GF(""));
+      if (thisModem().waitResponse(200) == 1) { return true; }
+      delay(100);
+    }
+    return false;
+  }
+
+  // TODO(vshymanskyy): Optimize this!
+  int8_t waitResponseImpl(uint32_t timeout_ms, String& data,
+                          GsmConstStr r1 = GFP(GSM_OK),
+                          GsmConstStr r2 = GFP(GSM_ERROR),
+                          GsmConstStr r3 = nullptr, GsmConstStr r4 = nullptr,
+                          GsmConstStr r5 = nullptr, GsmConstStr r6 = nullptr,
+                          GsmConstStr r7 = nullptr) {
+    data.reserve(64);
+
+#ifdef TINY_GSM_DEBUG_DEEP
+    DBG(GF("r1 <"), r1 ? r1 : GF("NULL"), GF("> r2 <"), r2 ? r2 : GF("NULL"),
+        GF("> r3 <"), r3 ? r3 : GF("NULL"), GF("> r4 <"), r4 ? r4 : GF("NULL"),
+        GF("> r5 <"), r5 ? r5 : GF("NULL"), GF("> r6 <"), r6 ? r6 : GF("NULL"),
+        GF("> r7 <"), r7 ? r7 : GF("NULL"), '>');
+#endif
+    uint8_t  index       = 0;
+    uint32_t startMillis = millis();
+    do {
+      TINY_GSM_YIELD();
+      while (thisModem().stream.available() > 0) {
+        TINY_GSM_YIELD();
+        int8_t a = thisModem().stream.read();
+        if (a <= 0) continue;  // Skip 0x00 bytes, just in case
+        data += static_cast<char>(a);
+        if (r1 && data.endsWith(r1)) {
+          index = 1;
+          goto finish;
+        } else if (r2 && data.endsWith(r2)) {
+          index = 2;
+          goto finish;
+        } else if (r3 && data.endsWith(r3)) {
+          index = 3;
+          goto finish;
+        } else if (r4 && data.endsWith(r4)) {
+          index = 4;
+          goto finish;
+        } else if (r5 && data.endsWith(r5)) {
+          index = 5;
+          goto finish;
+        } else if (r6 && data.endsWith(r6)) {
+          index = 6;
+          goto finish;
+        } else if (r7 && data.endsWith(r7)) {
+          index = 7;
+          goto finish;
+        }
+#if defined TINY_GSM_DEBUG
+        else if (data.endsWith(GFP(GSM_VERBOSE)) ||
+                 data.endsWith(GFP(GSM_VERBOSE_2))) {
+          // check how long the new line is
+          // should be either 1 ('\r' or '\n') or 2 ("\r\n"))
+          int len_atnl = strnlen(AT_NL, 3);
+          // Read out the verbose message, until the last character of the new
+          // line
+          data += thisModem().stream.readStringUntil(AT_NL[len_atnl]);
+#ifdef TINY_GSM_DEBUG_DEEP
+          data.trim();
+          DBG(GF("Verbose details <<<"), data, GF(">>>"));
+#endif
+          data = "";
+          goto finish;
+        }
+#endif
+        else if (thisModem().handleURCs(data)) {
+          data = "";
+        }
+      }
+    } while (millis() - startMillis < timeout_ms);
+  finish:
+#ifdef TINY_GSM_DEBUG_DEEP
+    data.replace("\r", "←");
+    data.replace("\n", "↓");
+#endif
+    if (!index) {
+      data.trim();
+      if (data.length()) { DBG("### Unhandled:", data); }
+      data = "";
+    } else {
+#ifdef TINY_GSM_DEBUG_DEEP
+      DBG('<', index, '>', data);
+#endif
+    }
+    return index;
+  }
+
+#ifdef INACTIVE
+// <MS> OLD 0.11.5 with changes
+  #define dbglvlmsg Error
+
+
+  int msCallLevelWaitResponse = 0;
+  int8_t waitResponse(uint32_t timeout_ms, String& data,
+                      GsmConstStr r1 = GFP(GSM_OK),
+                      GsmConstStr r2 = GFP(GSM_ERROR),
+#if defined TINY_GSM_DEBUG
+                      GsmConstStr r3 = GFP(GSM_CME_ERROR),
+                      GsmConstStr r4 = GFP(GSM_CMS_ERROR),
+#else
+                      GsmConstStr r3 = NULL, GsmConstStr r4 = NULL,
+#endif
+                      GsmConstStr r5 = NULL) {
+    msCallLevelWaitResponse++;
+    DBGLOG(Debug, "[TinyGsmSim7080]-%i >>", msCallLevelWaitResponse)
+    DBGCHK(Warn, MS_TINY_GSM_SEM_BLOCKED, "[TinyGsmSim7080]-%i Not blocked by calling function", msCallLevelWaitResponse)
+
+    data.reserve(64);
+    uint8_t  index       = 0;
+    uint32_t startMillis = millis();
+
+//    const unsigned long ms_timeout = 300;
+//    uint32_t ms_startMillisDelay = millis();
+
+    do {
+
+//
+      TINY_GSM_YIELD();
+/*
+      if (millis() - ms_timeout > ms_startMillisDelay) { 
+          delay(10);
+          DBGLOG(Debug, "[TinyGsmSim7080] time-out-1")
+          ms_startMillisDelay = millis();
+      }
+*/      
+      while (stream.available() > 0) {
+
+//
+//
+        TINY_GSM_YIELD();
+/*        
+        if (millis() - ms_timeout > ms_startMillisDelay) { 
+            delay(10);
+            DBGLOG(Debug, "[TinyGsmSim7080] time-out-2")
+            ms_startMillisDelay = millis();
+        }
+*/
+        int8_t a = stream.read();
+        if (a <= 0) continue;  // Skip 0x00 bytes, just in case
+        data += static_cast<char>(a);
+        if (r1 && data.endsWith(r1)) {
+          index = 1;
+          goto finish;
+        } else if (r2 && data.endsWith(r2)) {
+          index = 2;
+          goto finish;
+        } else if (r3 && data.endsWith(r3)) {
+#if defined TINY_GSM_DEBUG
+          if (r3 == GFP(GSM_CME_ERROR)) {
+            streamSkipUntil('\n');  // Read out the error
+          }
+#endif
+          index = 3;
+          goto finish;
+        } else if (r4 && data.endsWith(r4)) {
+          index = 4;
+          goto finish;
+        } else if (r5 && data.endsWith(r5)) {
+          index = 5;
+          goto finish;
+        } else if (data.endsWith(GF("+CARECV:"))) {
+          int8_t  mux = streamGetIntBefore(',');
+          int16_t len = streamGetIntBefore('\n');
+
+          DBGLOG(Info, "[TinyGsmSim7080]-%i mux: %hhi, len: %hi", msCallLevelWaitResponse, mux, len);
+
+          if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
+            sockets[mux]->got_data = true;
+// <MS>            
+//            if (len >= 0 && len <= 1024) { sockets[mux]->sock_available = len; }
+/* */            
+            if (len >= 0) { sockets[mux]->sock_available = len; }
+            if ((len < 0) || (len > TINY_GSM_RX_BUFFER)) {
+              DBGLOG(Warn, "[TinyGsmSim7080]-%i WARN len out of range: %hi", msCallLevelWaitResponse, len);
+            }
+           
+// <MS>            
+          }
+          data = "";
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Got Data: %hi on mux: %hhi", msCallLevelWaitResponse, len, mux)
+        } else if (data.endsWith(GF("+CADATAIND:"))) {
+          int8_t mux = streamGetIntBefore('\n');
+          if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
+            sockets[mux]->got_data = true;
+          }
+          data = "";
+          DBGLOG(Info, "[TinyGsmSim7080]-%i Got data on mux: %hhi", msCallLevelWaitResponse, mux)
+        } else if (data.endsWith(GF("+CASTATE:"))) {
+          int8_t mux   = streamGetIntBefore(',');
+          int8_t state = streamGetIntBefore('\n');
+          if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
+            if (state != 1) {
+              sockets[mux]->sock_connected = false;
+              DBGLOG(Info, "[TinyGsmSim7080]-%i Closed, mux: %hhi, state: %hhi", msCallLevelWaitResponse, mux, state)
+            }
+          }
+          data = "";
+        } else if (data.endsWith(GF("*PSNWID:"))) {
+          streamSkipUntil('\n');  // Refresh network name by network
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Network name updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
+          data = "";
+        } else if (data.endsWith(GF("*PSUTTZ:"))) {
+          streamSkipUntil('\n');  // Refresh time and time zone by network
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Network time and time zone updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
+          data = "";
+        } else if (data.endsWith(GF("+CTZV:"))) {
+          streamSkipUntil('\n');  // Refresh network time zone by network
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Network time zone updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
+          data = "";
+        } else if (data.endsWith(GF("DST: "))) {
+          streamSkipUntil('\n');  // Refresh Network Daylight Saving Time by network
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Daylight savings time state updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
+          data = "";
+        } else if (data.endsWith(GF(GSM_NL "SMS Ready" GSM_NL))) {
+          DBGLOG(Error, "[TinyGsmSim7080]-%i Unexpected module reset: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
+          data = "";
+// <MS>          
+//          init();
+// <MS>          
+          data = "";
+        } else if (data.indexOf(GF("VOLTAGE")) >= 0) {
+          DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Voltage-message: %s.", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
+          data = "";
+        } else {
+          String tmp = data;
+          tmp.replace(GSM_NL, "/");
+          tmp.trim();
+          if ((tmp.length() > 10) && 
+              (tmp.indexOf(GF("CNACT")) < 0) && 
+              (tmp.indexOf(GF("SLEDS")) < 0) && 
+              (tmp.indexOf(GF("CNET")) < 0) && 
+              (tmp.indexOf(GF("CSGS")) < 0) && 
+              (tmp.indexOf(GF("CGNAP")) < 0) && 
+              (tmp.indexOf(GF("CLTS")) < 0) )
+            {
+            DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Unknown message: '%s' (%s)", 
+              msCallLevelWaitResponse, asCharString(tmp.c_str(), 0, tmp.length()).c_str(), asHexString(tmp.c_str(), 0, tmp.length()).c_str())
+          }
+        }
+      }
+    } while (millis() - startMillis < timeout_ms);
+  finish:
+    if (!index) {
+      data.trim();
+      if (data.length()) { 
+        DBGLOG(Warn, "[TinyGsmSim7080]-%i Unhandled: '%s' (%s)", 
+          msCallLevelWaitResponse, 
+          asCharString(data.c_str(), 0, data.length()).c_str(), 
+          asHexString(data.c_str(), 0, data.length()).c_str() )
+        }
+      data = "";
+    }
+    data.replace(GSM_NL, "/");
+    // DBG('<', index, '>', data);
+/**/
+#if defined TINY_GSM_DEBUG
+//    if (index != 1) {
+      String r1s(r1); r1s.trim();
+      String r2s(r2); r2s.trim();
+      String r3s(r3); r3s.trim();
+      String r4s(r4); r4s.trim();
+      String r5s(r5); r5s.trim();
+      DBGLOG(Info, "[TinyGsmSim7080]-%i Input r1:%s, r2:%s, r3:%s, r4:%s, r5:%s", 
+        msCallLevelWaitResponse, 
+        asCharString(r1s.c_str(), 0, r1s.length()).c_str(),
+        asCharString(r2s.c_str(), 0, r2s.length()).c_str(),
+        asCharString(r3s.c_str(), 0, r3s.length()).c_str(),
+        asCharString(r4s.c_str(), 0, r4s.length()).c_str(),
+        asCharString(r5s.c_str(), 0, r5s.length()).c_str()
+        )
+      DBGLOG(Info, "[TinyGsmSim7080]-%i Return data: %s, return index: %hhu", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str(), index)
+//    }
+#endif
+
+    DBGLOG(Debug, "[TinyGsmSim7080]-%i << return index: %hhu", msCallLevelWaitResponse, index)
+    msCallLevelWaitResponse--;
+
+    return index;
+  } // waitResponse(...)
+
+#endif // INACTIVE
+
+  String getModemInfoImpl() {
+    thisModem().sendAT(GF("I"));  // 3GPP TS 27.007
+    String res;
+    if (thisModem().waitResponse(1000L, res) != 1) { return ""; }
+    thisModem().cleanResponseString(res);
+    return res;
+  }
+
+  String getModemNameImpl() {
+    String manufacturer = getModemManufacturer();
+    String model        = getModemModel();
+    String name         = manufacturer + String(" ") + model;
+    DBG("### Modem:", name);
+    return name;
+  }
+
+  // Gets the modem manufacturer
+  String getModemManufacturerImpl() {
+    String manufacturer = MODEM_MANUFACTURER;
+    thisModem().sendAT(GF("+CGMI"));  // 3GPP TS 27.007 standard
+    String res;
+    if (thisModem().waitResponse(1000L, res) != 1) { return manufacturer; }
+    thisModem().cleanResponseString(res);
+    return res;
+  }
+
+  // Gets the modem hardware version
+  String getModemModelImpl() {
+    String model = MODEM_MODEL;
+    thisModem().sendAT(GF("+CGMM"));  // 3GPP TS 27.007 standard
+    String res;
+    if (thisModem().waitResponse(1000L, res) != 1) { return model; }
+    thisModem().cleanResponseString(res);
+    return res;
+  }
+
+  // Gets the modem firmware version
+  String getModemRevisionImpl() {
+    thisModem().sendAT(GF("+CGMR"));  // 3GPP TS 27.007 standard
+    String res;
+    if (thisModem().waitResponse(1000L, res) != 1) { return "unknown"; }
+    thisModem().cleanResponseString(res);
+    return res;
+  }
+
+  // Gets the modem serial number
+  String getModemSerialNumberImpl() {
+    thisModem().sendAT(GF("+CGSN"));  // 3GPP TS 27.007 standard
+    String res;
+    if (thisModem().waitResponse(1000L, res) != 1) { return "unknown"; }
+    thisModem().cleanResponseString(res);
+    return res;
+  }
+
+  bool factoryDefaultImpl() {
+    thisModem().sendAT(GF("&FZE0&W"));  // Factory + Reset + Echo Off + Write
+    thisModem().waitResponse();
+    thisModem().sendAT(GF("+IPR=0"));  // Auto-baud
+    thisModem().waitResponse();
+    thisModem().sendAT(GF("&W"));  // Write configuration
+    return thisModem().waitResponse() == 1;
+  }
+
+  /*
+   * Power functions
+   */
+ protected:
+  bool radioOffImpl() {
+    if (!thisModem().setPhoneFunctionality(0)) { return false; }
+    delay(3000);
+    return true;
+  }
+
+  bool sleepEnableImpl(bool enable = true) TINY_GSM_ATTR_NOT_IMPLEMENTED;
+
+  bool setPhoneFunctionalityImpl(uint8_t fun, bool reset = false)
+      TINY_GSM_ATTR_NOT_IMPLEMENTED;
+
+  /*
+   * Generic network functions
+   */
+ protected:
+  // Gets the modem's registration status via CREG/CGREG/CEREG
+  // CREG = Generic network registration
+  // CGREG = GPRS service registration
+  // CEREG = EPS registration for LTE modules
+  int8_t getRegistrationStatusXREG(const char* regCommand) {
+    thisModem().sendAT('+', regCommand, '?');
+    // check for any of the three for simplicity
+    int8_t resp = thisModem().waitResponse(GF("+CREG:"), GF("+CGREG:"),
+                                           GF("+CEREG:"));
+    if (resp != 1 && resp != 2 && resp != 3) { return -1; }
+    thisModem().streamSkipUntil(','); /* Skip format (0) */
+    int status = thisModem().stream.parseInt();
+    thisModem().waitResponse();
+    return status;
+  }
+
+  bool waitForNetworkImpl(uint32_t timeout_ms   = 60000L,
+                          bool     check_signal = false) {
+    for (uint32_t start = millis(); millis() - start < timeout_ms;) {
+      if (check_signal) { thisModem().getSignalQuality(); }
+      if (thisModem().isNetworkConnected()) { return true; }
+      delay(250);
+    }
+    return false;
+  }
+
+  // Gets signal quality report according to 3GPP TS command AT+CSQ
+  int8_t getSignalQualityImpl() {
+    thisModem().sendAT(GF("+CSQ"));
+    if (thisModem().waitResponse(GF("+CSQ:")) != 1) { return 99; }
+    int8_t res = thisModem().streamGetIntBefore(',');
+    thisModem().waitResponse();
+    return res;
+  }
+
+  String getLocalIPImpl() {
+    thisModem().sendAT(GF("+CGPADDR=1"));
+    if (thisModem().waitResponse(GF("+CGPADDR:")) != 1) { return ""; }
+    thisModem().streamSkipUntil(',');  // Skip context id
+    String res = thisModem().stream.readStringUntil('\r');
+    if (thisModem().waitResponse() != 1) { return ""; }
+    return res;
   }
 }; // class TinyGsmModem
 
