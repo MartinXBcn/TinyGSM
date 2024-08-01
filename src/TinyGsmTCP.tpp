@@ -172,7 +172,7 @@ class TinyGsmTCP {
     }
 
     int read(uint8_t* buf, size_t size) override {
-      DBGLOG(Debug, "[TinyGsmTCP] >> size: %u", size)
+      DBGLOG(Verbose, "[TinyGsmTCP] >> size: %u", size)
 
       TINY_GSM_YIELD();
       size_t cnt = 0;
@@ -247,7 +247,7 @@ class TinyGsmTCP {
         }
       }
 
-      DBGLOG(Debug, "[TinyGsmTCP] << cnt: %u", cnt)
+      DBGLOG(Verbose, "[TinyGsmTCP] << cnt: %u", cnt)
       return cnt;
 
 #else
@@ -256,13 +256,13 @@ class TinyGsmTCP {
     } // int read(uint8_t* buf, size_t size)
 
     int read() override {
-      DBGLOG(Debug, "[TinyGsmTCP] >>")
+      DBGLOG(Verbose, "[TinyGsmTCP] >>")
 
       uint8_t c;
       int ret = -1;
       if (read(&c, 1) == 1) { return c; }
 
-      DBGLOG(Debug, "[TinyGsmTCP] << return %3i: '%c'", ret, (ret >= 32) && (ret < 127) ? c : '.')
+      DBGLOG(Verbose, "[TinyGsmTCP] << return %3i: '%c'", ret, (ret >= 32) && (ret < 127) ? c : '.')
       return ret;
     }
 

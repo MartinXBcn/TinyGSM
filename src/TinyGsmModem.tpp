@@ -560,9 +560,8 @@ class TinyGsmModem {
     return -9999.0F;
   }
 
-  #define DBGLVL_STREAMSKIPUNTIL Verbose
   inline bool streamSkipUntil(const char c, const uint32_t timeout_ms = 1000L) {
-    DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] >> c: '%c', timeout_ms: %" PRIu32, c, timeout_ms)
+    DBGLOG(Verbose, "[TinyGsmModem] >> c: '%c', timeout_ms: %" PRIu32, c, timeout_ms)
     DBGCOD(int idx = 0;)
     uint32_t startMillis = millis();
     while (millis() - startMillis < timeout_ms) {
@@ -571,13 +570,13 @@ class TinyGsmModem {
         TINY_GSM_YIELD();
       }
       if (thisModem().stream.read() == c) { 
-        DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] '%c' found at idx: %i", c, idx)
-        DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] << return: t")
+        DBGLOG(Verbose, "[TinyGsmModem] '%c' found at idx: %i", c, idx)
+        DBGLOG(Verbose, "[TinyGsmModem] << return: t")
         return true; 
       }
       DBGCOD(idx++;)
     }
-    DBGLOG(DBGLVL_STREAMSKIPUNTIL, "[TinyGsmModem] << return: f")
+    DBGLOG(Verbose, "[TinyGsmModem] << return: f")
     return false;
   }
 
@@ -638,6 +637,10 @@ class TinyGsmModem {
     return false;
   }
 
+  // With low transmission speed and/or high data volume while-loop causes watchdog-timeouts.
+  // Therefore, call delay after xxx ms.
+  #define MS_WAITRESPONSE_DELAY_TIMER_INTERVAL 100
+
   // TODO(vshymanskyy): Optimize this!
   int8_t waitResponseImpl(uint32_t timeout_ms, String& data,
                           GsmConstStr r1 = GFP(GSM_OK),
@@ -645,6 +648,7 @@ class TinyGsmModem {
                           GsmConstStr r3 = nullptr, GsmConstStr r4 = nullptr,
                           GsmConstStr r5 = nullptr, GsmConstStr r6 = nullptr,
                           GsmConstStr r7 = nullptr) {
+    unsigned long ms_delay_timer;
     data.reserve(64);
 
 #ifdef TINY_GSM_DEBUG_DEEP
@@ -655,7 +659,12 @@ class TinyGsmModem {
 #endif
     uint8_t  index       = 0;
     uint32_t startMillis = millis();
+    ms_delay_timer = millis() + MS_WAITRESPONSE_DELAY_TIMER_INTERVAL;
     do {
+      if (millis() > ms_delay_timer) {
+        delay(10);
+        ms_delay_timer = millis() + MS_WAITRESPONSE_DELAY_TIMER_INTERVAL;
+      }
       TINY_GSM_YIELD();
       while (thisModem().stream.available() > 0) {
         TINY_GSM_YIELD();
@@ -704,7 +713,7 @@ class TinyGsmModem {
         else if (thisModem().handleURCs(data)) {
           data = "";
         }
-      }
+      } // while
     } while (millis() - startMillis < timeout_ms);
   finish:
 #ifdef TINY_GSM_DEBUG_DEEP
@@ -723,7 +732,7 @@ class TinyGsmModem {
     return index;
   }
 
-#ifdef INACTIVE
+#ifdef MS_INACTIVE
 // <MS> OLD 0.11.5 with changes
   #define dbglvlmsg Error
 

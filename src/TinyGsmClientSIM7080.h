@@ -871,13 +871,12 @@ end:
         TINY_GSM_YIELD();
       }
       char c = stream.read();
-      DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) %4i: '%c'-%hhu", mux, i, (c < 32 || c > 126) ? 'X' : c, c)
       DBGCOD(tmp[i] = c;)
       sockets[mux]->rx.put(c);
     } // for i
     DBGCHK(Error, i == len_confirmed, "[TinyGsmSim7080] i(%i) != len_confirmed(%" PRIi16 "), i.e. time-out.", i, len_confirmed)
     DBGCOD(tmp[i] = '\0';)
-    DBGLOG(Debug,"[TinyGsmSim7080] (#%hhu) Read: %s", mux, tmp)
+    DBGLOG(Debug,"[TinyGsmSim7080] (#%hhu) Read: \n%s\n", mux, tmp)
     waitResponse();
     // make sure the sock available number is accurate again
     sockets[mux]->sock_available = modemGetAvailable(mux);
@@ -914,7 +913,7 @@ end:
 
         result_sum += result;
 
-        DBGLOG(Info, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=1: ret_mux: %i, available: %u", mux, muxNo, ret_mux, result);
+        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=1: ret_mux: %i, available: %u", mux, muxNo, ret_mux, result);
 
         GsmClientSim7080* sock    = sockets[ret_mux];
         if (sock) { sock->sock_available = result; }
@@ -931,7 +930,7 @@ end:
         // if we get an OK, we've reached the last socket with available data
         // so we set any we haven't gotten to yet to 0
 
-        DBGLOG(Info, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=2.", mux, muxNo);
+        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=2.", mux, muxNo);
 
         for (int extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT;
              extra_mux++) {
@@ -1067,7 +1066,7 @@ end:
         if (len >= 0 && len <= 1024) { sockets[mux]->sock_available = len; }
       }
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Got Data on mux: %hhi, len: %hi", mux, len)
+      DBGLOG(Debug, "{TinyGsmSim7080} Got Data on mux: %hhi, len: %hi", mux, len)
       return true;
     } else if (data.endsWith(GF("+CADATAIND:"))) {
       int8_t mux = streamGetIntBefore('\n');
@@ -1075,7 +1074,7 @@ end:
         sockets[mux]->got_data = true;
       }
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Got Data on mux: %hhi.", mux)
+      DBGLOG(Debug, "{TinyGsmSim7080} Got Data on mux: %hhi.", mux)
       return true;
     } else if (data.endsWith(GF("+CASTATE:"))) {
       int8_t mux   = streamGetIntBefore(',');

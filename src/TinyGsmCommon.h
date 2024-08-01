@@ -29,10 +29,10 @@
 
 extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 
-//#define logLevelSemTinyGsmInfo Debug
-#define logLevelSemTinyGsmInfo Info
-#define logLevelSemTinyGsmWarn Warn
-//#define logLevelSemTinyGsmWarn Debug
+#define logLevelSemTinyGsmInfo Debug
+//#define logLevelSemTinyGsmInfo Info
+//#define logLevelSemTinyGsmWarn Warn
+#define logLevelSemTinyGsmWarn Debug
 
 #define MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN 64
 DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
