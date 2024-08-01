@@ -426,27 +426,27 @@ end:
   
     MS_TINY_GSM_SEM_TAKE_WAIT("reportNetlightStatus")
 
-    DBGLOG(Info, "[TinyGsmTime] AT+SLEDS=?")
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+SLEDS=?")
     thisModem().sendAT(GF("+SLEDS=?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(Info, "[TinyGsmTime] AT+SLEDS?")
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+SLEDS?")
     thisModem().sendAT(GF("+SLEDS?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(Info, "[TinyGsmTime] AT+CNETLIGHT=?")
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+CNETLIGHT=?")
     thisModem().sendAT(GF("+CNETLIGHT=?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(Info, "[TinyGsmTime] AT+CNETLIGHT?")
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+CNETLIGHT?")
     thisModem().sendAT(GF("+CNETLIGHT?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(Info, "[TinyGsmTime] AT+CSGS=?")
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+CSGS=?")
     thisModem().sendAT(GF("+CSGS=?"));
     thisModem().waitResponse(2000L);
 
-    DBGLOG(Info, "[TinyGsmTime] AT+CSGS?")
+    DBGLOG(Info, "[TinyGsmSim70xx] AT+CSGS?")
     thisModem().sendAT(GF("+CSGS?"));
     thisModem().waitResponse(2000L);
 
