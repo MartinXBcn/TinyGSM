@@ -15,6 +15,20 @@
 
 #include "TinyGsmFifo.h"
 
+
+// Logging
+#undef MS_LOGGER_LEVEL
+#ifdef MS_TINYGSM_LOGGING
+#define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
+#endif
+#include "ESP32Logger.h"
+
+
+
+#if !defined(TINY_GSM_RX_BUFFER)
+#define TINY_GSM_RX_BUFFER 64
+#endif
+
 // Because of the ordering of resolution of overrides in templates, these need
 // to be written out every time.  This macro is to shorten that.
 #define TINY_GSM_CLIENT_CONNECT_OVERRIDES                             \
@@ -39,6 +53,11 @@
 
 template <class modemType, uint8_t muxCount>
 class TinyGsmTCP {
+  /* =========================================== */
+  /* =========================================== */
+  /*
+   * Define the interface
+   */
  public:
   /*
    * Basic functions
@@ -57,6 +76,7 @@ class TinyGsmTCP {
   inline modemType& thisModem() {
     return static_cast<modemType&>(*this);
   }
+  ~TinyGsmTCP() {}
 
   /*
    * Inner Client
@@ -114,12 +134,12 @@ class TinyGsmTCP {
     }
 
     size_t write(const char* str) {
-      if (str == NULL) return 0;
+      if (str == nullptr) return 0;
       return write((const uint8_t*)str, strlen(str));
     }
 
     int available() override {
-//<MS>      TINY_GSM_YIELD();
+      TINY_GSM_YIELD();
 #if defined TINY_GSM_NO_MODEM_BUFFER
       // Returns the number of characters available in the TinyGSM fifo
       if (!rx.size() && sock_connected) { at->maintain(); }
@@ -152,6 +172,8 @@ class TinyGsmTCP {
     }
 
     int read(uint8_t* buf, size_t size) override {
+      DBGLOG(Verbose, "[TinyGsmTCP] >> size: %u", size)
+
       TINY_GSM_YIELD();
       size_t cnt = 0;
 
@@ -224,22 +246,29 @@ class TinyGsmTCP {
           break;
         }
       }
+
+      DBGLOG(Verbose, "[TinyGsmTCP] << cnt: %u", cnt)
       return cnt;
 
 #else
 #error Modem client has been incorrectly created
 #endif
-    }
+    } // int read(uint8_t* buf, size_t size)
 
     int read() override {
+      DBGLOG(Verbose, "[TinyGsmTCP] >>")
+
       uint8_t c;
+      int ret = -1;
       if (read(&c, 1) == 1) { return c; }
-      return -1;
+
+      DBGLOG(Verbose, "[TinyGsmTCP] << return %3i: '%c'", ret, (ret >= 32) && (ret < 127) ? c : '.')
+      return ret;
     }
 
-	int peek() override {
-		return (uint8_t)rx.peek();
-	}
+    int peek() override {
+      return (uint8_t)rx.peek();
+    }
 
     void flush() override {
       at->stream.flush();
@@ -309,7 +338,13 @@ class TinyGsmTCP {
     bool       sock_connected;
     bool       got_data;
     RxFifo     rx;
-  };
+  }; // class GsmClient
+
+  /* =========================================== */
+  /* =========================================== */
+  /*
+   * Define the default function implementations
+   */
 
   /*
    * Basic functions
@@ -327,12 +362,12 @@ class TinyGsmTCP {
       }
     }
     while (thisModem().stream.available()) {
-      thisModem().waitResponse(15, NULL, NULL);
+      thisModem().waitResponse(15, nullptr, nullptr);
     }
 
 #elif defined TINY_GSM_NO_MODEM_BUFFER || defined TINY_GSM_BUFFER_READ_NO_CHECK
     // Just listen for any URC's
-    thisModem().waitResponse(100, NULL, NULL);
+    thisModem().waitResponse(100, nullptr, nullptr);
 
 #else
 #error Modem client has been incorrectly created
@@ -341,7 +376,7 @@ class TinyGsmTCP {
 
   // Yields up to a time-out period and then reads a character from the stream
   // into the mux FIFO
-  // TODO(SRGDamia1):  Do we need to wait two _timeout periods for no
+  // TODO(SRGDamia1):  Do we really need to wait _two_ timeout periods for no
   // character return?  Will wait once in the first "while
   // !stream.available()" and then will wait again in the stream.read()
   // function.

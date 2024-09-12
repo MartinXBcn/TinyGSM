@@ -10,13 +10,13 @@
 #define SRC_TINYGSMCOMMON_H_
 
 // The current library version number
-#define TINYGSM_VERSION "0.11.5"
+#define TINYGSM_VERSION "0.12.0"
 
 
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240072400
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240083000
 
 
 // Logging
@@ -29,10 +29,10 @@
 
 extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 
-//#define logLevelSemTinyGsmInfo Debug
-#define logLevelSemTinyGsmInfo Info
-#define logLevelSemTinyGsmWarn Warn
-//#define logLevelSemTinyGsmWarn Debug
+#define logLevelSemTinyGsmInfo Debug
+//#define logLevelSemTinyGsmInfo Info
+//#define logLevelSemTinyGsmWarn Warn
+#define logLevelSemTinyGsmWarn Debug
 
 #define MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN 64
 DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
@@ -102,6 +102,10 @@ DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
 #include <Client.h>
 #endif
 
+#ifndef TINY_GSM_YIELD_MS
+#define TINY_GSM_YIELD_MS 0
+#endif
+
 #ifndef TINY_GSM_YIELD
 #define TINY_GSM_YIELD() \
   { delay(TINY_GSM_YIELD_MS); }
@@ -150,6 +154,26 @@ static void DBG(Args... args) {
 #define DBG(...)
 #endif
 
+/*
+ * CRTP Helper
+ */
+template <typename modemType, template <typename> class crtpType>
+struct tinygsm_crtp {
+  modemType& thisModem() {
+    return static_cast<modemType&>(*this);
+  }
+  modemType const& thisModem() const {
+    return static_cast<modemType const&>(*this);
+  }
+
+ private:
+  tinygsm_crtp() {}
+  friend crtpType<modemType>;
+};
+
+/*
+ * Min/Max Helpers
+ */
 template <class T>
 const T& TinyGsmMin(const T& a, const T& b) {
   return (b < a) ? b : a;
@@ -160,6 +184,9 @@ const T& TinyGsmMax(const T& a, const T& b) {
   return (b < a) ? a : b;
 }
 
+/*
+ * Automatically find baud rate
+ */
 template <class T>
 uint32_t TinyGsmAutoBaud(T& SerialAT, uint32_t minimum = 9600,
                          uint32_t maximum = 115200) {

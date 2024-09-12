@@ -22,6 +22,11 @@ enum SimStatus {
 
 template <class modemType>
 class TinyGsmGPRS {
+  /* =========================================== */
+  /* =========================================== */
+  /*
+   * Define the interface
+   */
  public:
   /*
    * SIM card functions
@@ -95,8 +100,8 @@ class TinyGsmGPRS {
   /*
    * GPRS functions
    */
-  bool gprsConnect(const char* apn, const char* user = NULL,
-                   const char* pwd = NULL) {
+  bool gprsConnect(const char* apn, const char* user = nullptr,
+                   const char* pwd = nullptr) {
     return thisModem().gprsConnectImpl(apn, user, pwd);
   }
   bool gprsDisconnect() {
@@ -119,6 +124,18 @@ class TinyGsmGPRS {
     return o;
   }
 
+// Gets the current network provider
+  String getProvider() {
+    String p;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT("getOperator")
+
+    p = thisModem().getProviderImpl();
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
+    return p;  
+  }
   /*
    * CRTP Helper
    */
@@ -129,6 +146,13 @@ class TinyGsmGPRS {
   inline modemType& thisModem() {
     return static_cast<modemType&>(*this);
   }
+  ~TinyGsmGPRS() {}
+
+  /* =========================================== */
+  /* =========================================== */
+  /*
+   * Define the default function implementations
+   */
 
   /*
    * SIM card functions
@@ -221,7 +245,7 @@ class TinyGsmGPRS {
     // localIP() also blocks, therefore "give" already here.
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    if (res == 1) { ret = thisModem().localIP() != IPAddress(0, 0, 0, 0); }
+    if (res == 1) { ret = (thisModem().localIP() != IPAddress(0, 0, 0, 0)); }
 
 end:
     DBGLOG(Debug, "[TinyGsmGPRS] << return: %s", DBGB2S(ret))
@@ -238,6 +262,8 @@ end:
     thisModem().waitResponse();
     return res;
   }
+
+  String getProviderImpl() TINY_GSM_ATTR_NOT_IMPLEMENTED;
 };
 
 #endif  // SRC_TINYGSMGPRS_H_
