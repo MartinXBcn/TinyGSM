@@ -128,7 +128,11 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
   bool setPhoneFunctionalityImpl(uint8_t fun, bool reset = false) {
     DBGLOG(Info, "[GsmClientSim70xx] >> AT+CFUN=%hhu%s", fun, reset ? ",1" : "")
     thisModem().sendAT(GF("+CFUN="), fun, reset ? ",1" : "");
-    bool ret = thisModem().waitResponse(10000L) == 1;
+    String s;
+    bool ret = thisModem().waitResponse(10000L, s) == 1;
+    DBGLOG(Info, "AT+CFUN=%hhu%s returned - 1: %s, %s", fun, reset ? ",1" : "", DBGB2S(ret), s.c_str())
+    thisModem().waitResponse(10000L, s);
+    DBGLOG(Info, "AT+CFUN=%hhu%s returned - 2: %s", fun, reset ? ",1" : "", s.c_str())
     DBGLOG(Info, "[GsmClientSim70xx] << return: %s", DBGB2S(ret))
     return ret;
   }
@@ -137,6 +141,21 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
    * Generic network functions
    */
  public:
+  // <MS>
+  const char* getRegistrationStatus(SIM70xxRegStatus espStatus) {
+    switch(espStatus) {
+      case REG_NO_RESULT: return "REG_NO_RESULT";
+      case REG_UNREGISTERED: return "REG_UNREGISTERED";
+      case REG_SEARCHING: return "REG_SEARCHING";
+      case REG_DENIED: return "REG_DENIED";
+      case REG_OK_HOME: return "REG_OK_HOME";
+      case REG_OK_ROAMING: return "REG_OK_ROAMING";
+      case REG_UNKNOWN: return "REG_UNKNOWN";
+      default:
+        return "Error";
+    }
+  }
+
   SIM70xxRegStatus getRegistrationStatus() {
     DBGLOG(Info, "[TinyGsmSim70xx] >>")
 
@@ -154,11 +173,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
 
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    if (epsStatus > REG_OK_ROAMING) {
-      DBGLOG(Warn, "[TinyGsmSim70xx] registration status unknown: %i", epsStatus)
-    }
-
-    DBGLOG(Info, "[TinyGsmSim70xx] << return registration status: %i", epsStatus)
+    DBGLOG(Info, "[TinyGsmSim70xx] << return registration status: %i - %s", epsStatus, getRegistrationStatus(epsStatus))
     return epsStatus;
   }
 
@@ -423,32 +438,39 @@ end:
   // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
   **/
   bool reportNetlightStatus() {
-  
+    String s;
+
     MS_TINY_GSM_SEM_TAKE_WAIT("reportNetlightStatus")
 
     DBGLOG(Info, "[TinyGsmSim70xx] AT+SLEDS=?")
     thisModem().sendAT(GF("+SLEDS=?"));
-    thisModem().waitResponse(2000L);
+    thisModem().waitResponse(2000L, s);
+    DBGLOG(Info, "[TinyGsmSim70xx] +SLEDS=?: %s", s.c_str());
 
     DBGLOG(Info, "[TinyGsmSim70xx] AT+SLEDS?")
     thisModem().sendAT(GF("+SLEDS?"));
-    thisModem().waitResponse(2000L);
+    thisModem().waitResponse(2000L, s);
+    DBGLOG(Info, "[TinyGsmSim70xx] +SLEDS?: %s", s.c_str());
 
     DBGLOG(Info, "[TinyGsmSim70xx] AT+CNETLIGHT=?")
     thisModem().sendAT(GF("+CNETLIGHT=?"));
-    thisModem().waitResponse(2000L);
+    thisModem().waitResponse(2000L, s);
+    DBGLOG(Info, "[TinyGsmSim70xx] +CNETLIGHT=?: %s", s.c_str());
 
     DBGLOG(Info, "[TinyGsmSim70xx] AT+CNETLIGHT?")
     thisModem().sendAT(GF("+CNETLIGHT?"));
-    thisModem().waitResponse(2000L);
+    thisModem().waitResponse(2000L, s);
+    DBGLOG(Info, "[TinyGsmSim70xx] +CNETLIGHT?: %s", s.c_str());
 
     DBGLOG(Info, "[TinyGsmSim70xx] AT+CSGS=?")
     thisModem().sendAT(GF("+CSGS=?"));
-    thisModem().waitResponse(2000L);
+    thisModem().waitResponse(2000L, s);
+    DBGLOG(Info, "[TinyGsmSim70xx] +CSGS=?: %s", s.c_str());
 
     DBGLOG(Info, "[TinyGsmSim70xx] AT+CSGS?")
     thisModem().sendAT(GF("+CSGS?"));
-    thisModem().waitResponse(2000L);
+    thisModem().waitResponse(2000L, s);
+    DBGLOG(Info, "[TinyGsmSim70xx] +CSGS?: %s", s.c_str());
 
     MS_TINY_GSM_SEM_GIVE_WAIT
 
