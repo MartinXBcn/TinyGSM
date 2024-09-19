@@ -72,13 +72,17 @@ class TinyGsmModem {
    * @return *false* Something failed in module set up
    */
   bool begin(const char* pin = nullptr) {
-    return thisModem().initImpl(pin);
+    bool b;
+    b = thisModem().initImpl(pin);
+    return b;
   }
   /**
    * @copydoc TinyGsmModem::begin()
    */
   bool init(const char* pin = nullptr) {
-    return thisModem().initImpl(pin);
+    bool b;
+    b = thisModem().initImpl(pin);
+    return b;
   }
 
   /**
@@ -322,14 +326,7 @@ class TinyGsmModem {
    */
   bool restart(const char* pin = nullptr) {
     bool b = false;
-
-// Not necessary, should only be called anyway when any other gsm-function runs in parallel.
-    MS_TINY_GSM_SEM_TAKE_WAIT("restart")
-
     b = thisModem().restartImpl(pin);
-
-    MS_TINY_GSM_SEM_GIVE_WAIT
-
     return b;
   }
   /**

@@ -204,14 +204,23 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
    * Basic functions
    */
  protected:
+  bool initRunning = false;
   bool initImpl(const char* pin = nullptr) {
     SimStatus ret;
     bool r = false;
+    bool gotATOK = false;
     DBGLOG(Info, "[TinyGsmSim7080] >> pin: '%s'", pin == NULL ? "-" : pin);
     DBGLOG(Info, "[TinyGsmSim7080] Version: %s", TINYGSM_VERSION);
     DBGLOG(Info, "[TinyGsmSim7080] Compiled Module: TinyGsmClientSIM7080");
 
+    if (initRunning) {
+      DBGLOG(Warn, "[TinyGsmSim7080] Initialization already running!")
+      goto endxx;
+    }
+
     MS_TINY_GSM_SEM_TAKE_WAIT("initImpl")
+
+    initRunning = true;
 
 /* <MS> old 0.11.5
     if (!testAT()) { 
@@ -228,7 +237,6 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 */
 
-    bool gotATOK = false;
     for (uint32_t start = millis(); millis() - start < 10000L;) {
       sendAT(GF(""));
       int8_t resp = waitResponse(200L, GFP(GSM_OK), GFP(GSM_ERROR), GF("AT"));
@@ -287,6 +295,9 @@ end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
 endx:
+    initRunning = false;
+
+endxx:
     DBGLOG(Info, "[TinyGsmSim7080] << return: %s", DBGB2S(r));
     return r;
   } // TinyGsmSim7080::initImpl(...)
@@ -326,40 +337,67 @@ endx:
    */
  protected:
   bool restartImpl(const char* pin = nullptr) {
-    DBGLOG(Debug, "[TinyGsmSim7080] >>");
+    DBGLOG(Info, "[TinyGsmSim7080] >>");
 
     MS_TINY_GSM_SEM_TAKE_WAIT("getLocalIPImpl")
 
     bool success = true;
+    int8_t resp;
+    String s;
 
     bool gotATOK = false;
     for (uint32_t start = millis(); millis() - start < 10000L;) {
       sendAT(GF(""));
-      int8_t resp = waitResponse(200L, GFP(GSM_OK), GFP(GSM_ERROR), GF("AT"));
+      resp = waitResponse(200L, s, GFP(GSM_OK), GFP(GSM_ERROR), GF("AT"));
+      DBGLOG(Info, "[TinyGsmSim7080] Empty AT returned: %i, %s", resp, s.c_str());
       if (resp == 1) {
         gotATOK = true;
         break;
       } else if (resp == 3) {
         waitResponse(200L);  // get the OK
-        DBG(GF("## Turning off echo!"));
+        DBGLOG(Info, "[TinyGsmSim7080] Turning off echo!");
         sendAT(GF("E0"));  // Echo Off
         waitResponse(2000L);
       }
       delay(100);
     }
+    DBGCHK(Error, gotATOK, "[TinyGsmSim7080] Restart failed, no answer 'AT' received!")
     if (!gotATOK) { success = false; goto end; }
 
+    DBGLOG(Info, "[TinyGsmSim7080] setPhoneFunctionality(0) ...");
+    if (!setPhoneFunctionality(0)) { 
+      DBGLOG(Error, "[TinyGsmSim7080] Restart failed, setPhoneFunctionality(0) failed!")
+      goto end; 
+    }
+    DBGLOG(Info, "[TinyGsmSim7080] setPhoneFunctionality(1, true) ...");
+//    if (!setPhoneFunctionality(1, true)) { 
+    if (!setPhoneFunctionality(1)) { 
+      DBGLOG(Error, "[TinyGsmSim7080] Restart failed, setPhoneFunctionality(1, true) failed!")
+      goto end; 
+    }
+
+    DBGLOG(Info, "[TinyGsmSim7080] Rebooting ...");
     sendAT(GF("+CREBOOT"));  // Reboot
-    success &= waitResponse() == 1;
-    waitResponse(30000L, GF("SMS Ready"));
+    success &= waitResponse(30000L, s) == 1;
+    DBGCHK(Error, success, "[TinyGsmSim7080] Reboot failed: %s", s.c_str())
+    DBGCHK(Info, !success, "[TinyGsmSim7080] Reboot initiated successful: %s", s.c_str())
+/**/    
+    resp = waitResponse(30000L, s);
+//    resp = waitResponse(30000L, s, GF("SMS Ready"));
+    DBGLOG(Info, "[TinyGsmSim7080] Reboot response: %i, %s", resp, s.c_str());
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
+
     success &= initImpl(pin);
+    goto endx;
 
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(Debug, "[TinyGsmSim7080] << return: %s", DBGB2S(success));
+  endx:
+    DBGLOG(Info, "[TinyGsmSim7080] << return: %s", DBGB2S(success));
     return success;
-  }
+  } // TinyGsmSim7080::restartImpl(...)
 
   /*
    * Generic network functions
@@ -1109,8 +1147,8 @@ end:
       return true;
     } else if (data.endsWith(GF(AT_NL "SMS Ready" AT_NL))) {
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Unexpected module reset!")
-      init();
+      DBGLOG(Error, "{TinyGsmSim7080} Unexpected module reset!")
+//      init();
       data = "";
       return true;
     } 
