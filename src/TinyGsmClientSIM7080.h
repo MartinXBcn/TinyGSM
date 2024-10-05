@@ -187,6 +187,12 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     TINY_GSM_CLIENT_CONNECT_OVERRIDES
   }; // GsmClientSecureSIM7080
 
+ // <MS>
+ public:
+  // Set by handleURCs(...) when receiving "DST" from the network.
+  // -1: not set, 0: standard time, 1: daylight saving time
+  int dayLightSaving = -1;
+
   /*
    * Constructor
    */
@@ -586,7 +592,7 @@ end:
     DBGLOG(Info, "[TinyGsmSim7080] >> server: %s, TimeZone: %i", server.c_str(), TimeZone);
     byte r = -1;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("gprsDisconnectImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT("NTPServerSyncImpl")
 
     // Set GPRS bearer profile to associate with NTP sync
     // this may fail, it's not supported by all modules
@@ -1131,19 +1137,27 @@ end:
       DBGLOG(Info, "{TinyGsmSim7080} Network name updated.")
       return true;
     } else if (data.endsWith(GF("*PSUTTZ:"))) {
-      streamSkipUntil('\n');  // Refresh time and time zone by network
+      char dest[32];
+      streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
+//      streamSkipUntil('\n');  // Refresh time and time zone by network
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Network time and time zone updated.")
+      DBGLOG(Info, "{TinyGsmSim7080} Network time and time zone updated, *PSUTTZ: %s", dest)
       return true;
     } else if (data.endsWith(GF("+CTZV:"))) {
-      streamSkipUntil('\n');  // Refresh network time zone by network
+      char dest[32];
+      streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
+//      streamSkipUntil('\n');  // Refresh network time zone by network
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Network time zone updated.")
+      DBGLOG(Info, "{TinyGsmSim7080} Network time zone updated, +CTZV: %s", dest)
       return true;
     } else if (data.endsWith(GF("DST: "))) {
-      streamSkipUntil('\n');  // Refresh Network Daylight Saving Time by network
+      int dst = streamGetIntBefore('\n');  // Refresh time zone by network
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Daylight savings time state updated.")
+      DBGCHK(Error, (dst == 0) || (dst == 1), "{TinyGsmSim7080} Daylight savings time state updated, DST out of range: %i", dst)
+      DBGCHK(Info, !((dst == 0) || (dst == 1)), "{TinyGsmSim7080} Daylight savings time state updated, DST: %i", dst)
+      if ((dst == 0) || (dst == 1)) { 
+        dayLightSaving = dst;
+      }
       return true;
     } else if (data.endsWith(GF(AT_NL "SMS Ready" AT_NL))) {
       data = "";
