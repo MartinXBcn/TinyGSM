@@ -562,6 +562,14 @@ class TinyGsmModem {
     return -9999.0F;
   }
 
+  // <MS>
+  inline char* streamGetCharBefore(char lastChar, char* dest, size_t dest_size) {
+    size_t bytesRead = thisModem().stream.readBytesUntil(lastChar, dest, dest_size - 1);
+    dest[bytesRead] = '\0';
+    return dest;
+  }
+
+
   inline bool streamSkipUntil(const char c, const uint32_t timeout_ms = 1000L) {
     DBGLOG(Verbose, "[TinyGsmModem] >> c: '%c', timeout_ms: %" PRIu32, c, timeout_ms)
     DBGCOD(int idx = 0;)
