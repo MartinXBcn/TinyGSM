@@ -16,7 +16,7 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240083000
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 240100500
 
 
 // Logging
@@ -31,8 +31,8 @@ extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 
 #define logLevelSemTinyGsmInfo Debug
 //#define logLevelSemTinyGsmInfo Info
-//#define logLevelSemTinyGsmWarn Warn
-#define logLevelSemTinyGsmWarn Debug
+#define logLevelSemTinyGsmWarn Warn
+//#define logLevelSemTinyGsmWarn Debug
 
 #define MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN 64
 DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
