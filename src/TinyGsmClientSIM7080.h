@@ -274,13 +274,17 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 
     // Enable battery checks
+// <MS>
+// IMPORTANT: 
+// +CBATCHK=1 has to be set! Or not?
+//    sendAT(GF("+CBATCHK=0"));
     sendAT(GF("+CBATCHK=1"));
     // Disable battery checks
-//    sendAT(GF("+CBATCHK=0"));
     if (waitResponse() != 1) { 
       DBGLOG(Error, "[TinyGsmSim7080] Disable-bat-checks failed! Stop.")
       goto end; 
     }
+
 
     MS_TINY_GSM_SEM_GIVE_WAIT
 
