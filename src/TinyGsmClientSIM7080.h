@@ -1166,7 +1166,7 @@ end:
       return true;
     } else if (data.endsWith(GF(AT_NL "SMS Ready" AT_NL))) {
       data = "";
-      DBGLOG(Error, "{TinyGsmSim7080} Unexpected module reset!")
+      DBGLOG(Warn, "{TinyGsmSim7080} Unexpected module reset!")
 //      init();
       data = "";
       return true;

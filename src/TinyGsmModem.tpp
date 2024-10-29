@@ -900,7 +900,7 @@ class TinyGsmModem {
           DBGLOG(dbglvlmsg, "[TinyGsmSim7080]-%i Daylight savings time state updated: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
           data = "";
         } else if (data.endsWith(GF(GSM_NL "SMS Ready" GSM_NL))) {
-          DBGLOG(Error, "[TinyGsmSim7080]-%i Unexpected module reset: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
+          DBGLOG(Warn, "[TinyGsmSim7080]-%i Unexpected module reset: %s", msCallLevelWaitResponse, asCharString(data.c_str(), 0, data.length()).c_str())
           data = "";
 // <MS>          
 //          init();

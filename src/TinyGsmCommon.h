@@ -67,6 +67,7 @@ DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
 		DBGCOD(BaseType_t r =) \
     xSemaphoreGive(msTinyGsmSemCriticalProcess); \
 		DBGCHK(Error, r == pdTRUE, "### TINY_GSM ### <--- sem-give returned error."); \
+    DBGCOD(strcpy(msTinyGsmSemBlockedBy, "");) \
 	} 
 
 // End of a block started with [MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE].
