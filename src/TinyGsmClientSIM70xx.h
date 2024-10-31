@@ -41,6 +41,10 @@
 #include "TinyGsmGPS.tpp"
 
 
+// For ms_strncpy(...)
+#include "ms_General.h"
+
+
 // Logging
 #undef MS_LOGGER_LEVEL
 #ifdef MS_TINYGSM_LOGGING
@@ -58,6 +62,36 @@ enum SIM70xxRegStatus {
   REG_OK_ROAMING   = 5,
   REG_UNKNOWN      = 4,
 };
+
+
+// UserEquipmentSystemInfo (UESI)
+#define MS_UESI_SYSTEMMODE_MAXLEN 16
+#define MS_UESI_OPERATIONMODE_MAXLEN 32
+#define MS_UESI_MCC_MNC_MAXLEN 8
+#define MS_UESI_TAC_MAXLEN 16
+#define MS_UESI_SCELLID_MAXLEN 16
+#define MS_UESI_PCELLID_MAXLEN 16
+#define MS_UESI_FREQUENCYBAND_MAXLEN 16
+
+// <MS>
+class MsUserEquipmentSystemInfo {
+public:
+  char systemMode[MS_UESI_SYSTEMMODE_MAXLEN] = "";
+  char operationMode[MS_UESI_OPERATIONMODE_MAXLEN] = "";
+  char MCC_MNC[MS_UESI_MCC_MNC_MAXLEN] = "";            // <MCC>-<MNC>
+  char TAC[MS_UESI_TAC_MAXLEN] = "";
+  char sCellID[MS_UESI_SCELLID_MAXLEN] = "";
+  char pCellID[MS_UESI_PCELLID_MAXLEN] = "";
+  char frequencyBand[MS_UESI_FREQUENCYBAND_MAXLEN] = "";
+  int earfcn = 0;
+  int dlbw = 0;
+  int ulbw = 0;
+  int RSRQ = 0;
+  int RSRP = 0;
+  int RSSI ;
+  int RSSNR = 0;
+};
+// <MS>
 
 template <class SIM70xxType>
 class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
@@ -431,6 +465,80 @@ end:
   }
 
  public:
+
+  // <MS>
+  /**
+  // @brief       
+  // @return      
+  // @note        
+  **/
+  bool getUserEquipmentSystemInfo(MsUserEquipmentSystemInfo& si) {
+    bool ret = false;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT("getUserEquipmentSystemInfo")
+
+    thisModem().sendAT(GF("+CPSI?"));
+    if (thisModem().waitResponse(GF(AT_NL "+CPSI: ")) != 1) goto end;
+    thisModem().streamGetCharBefore(',', si.systemMode, sizeof(si.systemMode));
+    if (strcmp(si.systemMode, "GSM") == 0) { 
+      DBGLOG(Error, "[TinyGsmSim70xx] Only 'LTE' is supported, but 'GSM' was found!")
+      goto end;
+    }
+    if (strcmp(si.systemMode, "NO SERVICE") == 0) { 
+      DBGLOG(Warn, "[TinyGsmSim70xx] 'NO SERVICE' was found!")
+      goto end;
+    }
+    // Only read data concerning "LTE"
+    thisModem().streamGetCharBefore(',', si.operationMode, sizeof(si.operationMode));
+    thisModem().streamGetCharBefore(',', si.MCC_MNC, sizeof(si.MCC_MNC));
+    thisModem().streamGetCharBefore(',', si.TAC, sizeof(si.TAC));
+    thisModem().streamGetCharBefore(',', si.sCellID, sizeof(si.sCellID));
+    thisModem().streamGetCharBefore(',', si.pCellID, sizeof(si.pCellID));
+    thisModem().streamGetCharBefore(',', si.frequencyBand, sizeof(si.frequencyBand));
+    si.earfcn = thisModem().streamGetIntBefore(',');
+    si.dlbw = thisModem().streamGetIntBefore(',');
+    si.ulbw = thisModem().streamGetIntBefore(',');
+    si.RSRQ = thisModem().streamGetIntBefore(',');
+    si.RSRP = thisModem().streamGetIntBefore(',');
+    si.RSSI = thisModem().streamGetIntBefore(',');
+    si.RSSNR = thisModem().streamGetIntBefore('\n');
+    thisModem().waitResponse();
+
+    ret = true;
+
+end:
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    
+    return ret;
+  } // TinyGsmSim70xx.getUserEquipmentSystemInfo
+
+  // <MS>
+  /**
+  // @brief       
+  // @return      
+  // @note        
+  **/
+  bool getNetworkAPN(char* apn, size_t maxlen) {
+    bool ret = false;
+    apn[0] = 0;
+
+    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkAPN")
+
+    thisModem().sendAT(GF("+CGNAPN"));
+    if (thisModem().waitResponse(GF(AT_NL "+CGNAPN: ")) != 1) goto end;
+    if (thisModem().streamGetIntBefore(',') != 1) goto end;
+    thisModem().streamSkipUntil('"');
+    thisModem().streamGetCharBefore('"', apn, maxlen);
+    thisModem().waitResponse();
+
+    ret = true;
+
+end:
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    
+    return ret;
+  } // TinyGsmSim70xx.getNetworkAPN
+
   // <MS>
   /**
   // @brief       Logs actual settings of AT+SLEDS, AT+CNETLIGHT, AT+CSGS.
