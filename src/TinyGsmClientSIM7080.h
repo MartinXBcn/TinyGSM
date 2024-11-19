@@ -110,7 +110,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     } // bool GsmClientSim7080::init(...)
 
    public:
-    virtual int connect(const char* host, uint16_t port, int timeout_s) {
+    // virtual 
+    int connect(const char* host, uint16_t port, int timeout_s) {
       DBGLOG(Info, "[GsmClientSim7080] >>")
       stop();
       TINY_GSM_YIELD();
@@ -118,9 +119,17 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       sock_connected = at->modemConnect(host, port, mux, false, timeout_s);
       DBGLOG(Info, "[GsmClientSim7080] << return sock_connected: %s", DBGB2S(sock_connected))
       return sock_connected;
-    } // GsmClientSim7080::int connect(...)
+    } // int GsmClientSim7080::connect(...)
     TINY_GSM_CLIENT_CONNECT_OVERRIDES
-
+/*
+    // Added due to new C++-compiler-standard with ESP-IDF 5.3.1.
+    int connect(IPAddress ip, uint16_t port, int32_t timeout) override {
+      return connect(ip, port, (int)timeout);
+    } 
+    int connect(const char *host, uint16_t port, int32_t timeout) override {
+      return connect(host, port, (int)timeout);
+    }
+*/
     void stop(uint32_t maxWaitMs) {
       DBGLOG(Info, "[GsmClientSim7080] >>")
 
@@ -175,7 +184,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       return r;
     }
 
-    int connect(const char* host, uint16_t port, int timeout_s) override {
+    int connect(const char* host, uint16_t port, int timeout_s) 
+    //override 
+    {
       DBGLOG(Info, "[GsmClientSecureSIM7080] >> host: '%s', port: %hu", host == NULL ? "-" : host, port)
       stop();
       TINY_GSM_YIELD();
