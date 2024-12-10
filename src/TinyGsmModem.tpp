@@ -215,11 +215,6 @@ class TinyGsmModem {
     return waitResponse(1000L, r1, r2, r3, r4, r5, r6, r7);
   }
 
-  // <MS>
-  bool waitResponsePlain(unsigned long timeout_ms, char* data, size_t data_size) {
-    return thisModem().waitResponsePlainImpl(timeout_ms, data, data_size);
-  }
-
   /**
    * @brief Asks for modem information via the 3GPP TS 27.007 standard ATI
    * command
@@ -238,7 +233,6 @@ class TinyGsmModem {
 
     return s;
   }
-  // Gets the modem name (as it calls itself)
 
   /**
    * @brief Get the modem name - a combination of the manufacturer and model, as

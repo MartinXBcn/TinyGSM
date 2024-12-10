@@ -350,6 +350,12 @@ class TinyGsmTCP {
    * Define the default function implementations
    */
 
+  /* =========================================== */
+  /* =========================================== */
+  /*
+   * Define the default function implementations
+   */
+
   /*
    * Basic functions
    */
