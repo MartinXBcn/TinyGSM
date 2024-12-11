@@ -215,8 +215,8 @@ class TinyGsmModem {
     return waitResponse(1000L, r1, r2, r3, r4, r5, r6, r7);
   }
   // <MS>
-  bool waitResponsePlain(unsigned long timeout_ms, char* data, size_t data_size) {
-    return thisModem().waitResponsePlainImpl(timeout_ms, data, data_size);
+  bool waitResponsePlain(unsigned long timeout_ms, std::string& data) {
+    return thisModem().waitResponsePlainImpl(timeout_ms, data);
   }
 
 
@@ -739,36 +739,34 @@ class TinyGsmModem {
 #endif
     }
     return index;
-  }
+  } // int8_t waitResponseImpl(...)
 
 
   // <MS>
-  bool waitResponsePlainImpl(unsigned long timeout_ms, char* data, size_t data_size) {
-    DBGLOG(Debug, "[TinyGsmModem] >> timeout_ms: %lu, data_size: %u", timeout_ms, data_size)
+  bool waitResponsePlainImpl(unsigned long timeout_ms, std::string& data) {
+    DBGLOG(Debug, "[TinyGsmModem] >> timeout_ms: %lu", timeout_ms)
     unsigned long ms_delay_timer;
     unsigned long startMillis = millis();
-    data[0] = '\0';
-    int dataIdx = 0;
     ms_delay_timer = millis() + MS_WAITRESPONSE_DELAY_TIMER_INTERVAL;
-    int counterNL = 0;
+    bool ret = false;
+    data = "";
     do {
       if (millis() > ms_delay_timer) {
         delay(10);
         ms_delay_timer = millis() + MS_WAITRESPONSE_DELAY_TIMER_INTERVAL;
       }
       TINY_GSM_YIELD();
-      while ((thisModem().stream.available() > 0) && (dataIdx < data_size - 1)) {
+      while (thisModem().stream.available() > 0) {
         TINY_GSM_YIELD();
         int8_t a = thisModem().stream.read();
         DBGLOG(Debug, "[TinyGsmModem] a: %3hhi-%c", a, a)
         if (a <= 0) continue;  // Skip 0x00 bytes, just in case
-        data[dataIdx++] = (char)a;
-        if (a == '\n') counterNL++;
+        data += (char)a;
       } // while
-    } while ((millis() - startMillis < timeout_ms) && (counterNL < 2));
-    data[dataIdx] = '\0';
-    DBGLOG(Debug, "[TinyGsmModem] << return: %s, data: %s", DBGB2S(counterNL > 1), data)
-    return counterNL > 1;
+    } while ((millis() - startMillis < timeout_ms) && (!data.contains(GF("OK"))));
+    ret = data.contains(GF("OK"));
+    DBGLOG(Debug, "[TinyGsmModem] << return: %s, data: %s", DBGB2S(ret), data.c_str())
+    return ret;
   }
 
 
