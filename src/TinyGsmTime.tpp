@@ -189,6 +189,9 @@ class TinyGsmTime {
     thisModem().waitResponse();
     ret = true;
 
+    DBGLOG(Info, "[TinyGsmTime] Date: %02i.%02i.%04i, Time: %02i:%02i:%02i, Timezone: %f", 
+      iday, imonth, iyear, ihour, imin, isec, static_cast<float>(itimezone) / 4.0)
+
 end:    
     DBGLOG(Info, "[TinyGsmTime] >> return: %s", DBGB2S(ret))
     return ret;
