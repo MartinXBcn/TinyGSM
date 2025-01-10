@@ -618,12 +618,16 @@ end:
 
     // Set NTP server and timezone
     sendAT(GF("+CNTP=\""), server, "\",", String(TimeZone));
-    if (waitResponse(10000L) != 1) { goto end; }
+    if (waitResponse(10000L) != 1) { 
+      DBGLOG(Warn, "[TinyGsmSim7080] No response or not 'OK'.")
+      goto end; 
+    }
 
     // Request network synchronization
     sendAT(GF("+CNTP"));
     if (waitResponse(10000L, GF("+CNTP:"))) {
       String result = stream.readStringUntil('\n');
+      DBGLOG(Info, "[TinyGsmSim7080] AT+CNTP response: %s", result.c_str());
       // Check for ',' in case the module appends the time next to the return
       // code. Eg: +CNTP: <code>[,<time>]
       int index = result.indexOf(',');
@@ -1159,7 +1163,8 @@ end:
       data = "";
       DBGLOG(Info, "{TinyGsmSim7080} Network time and time zone updated, *PSUTTZ: %s", dest)
       return true;
-    } else if (data.endsWith(GF("+CTZV:"))) {
+//    } else if (data.endsWith(GF("+CTZV:"))) {
+    } else if (data.endsWith(GF("CTZV:"))) {
       char dest[32];
       streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
 //      streamSkipUntil('\n');  // Refresh network time zone by network
