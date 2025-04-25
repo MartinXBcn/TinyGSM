@@ -203,6 +203,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
   // Set by handleURCs(...) when receiving "DST" from the network.
   // -1: not set, 0: standard time, 1: daylight saving time
   // Sometimes not set by the network, therefore stored in preferences by MsGsm as default for next time re-start.
+  // At the moment not used (dst is detected by msSetTime() using the actual date)
   int dayLightSaving = -1;
 
   /*
