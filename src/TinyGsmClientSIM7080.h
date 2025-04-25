@@ -1152,16 +1152,18 @@ end:
       data = "";
       return true;
     } else if (data.endsWith(GF("*PSNWID:"))) {
-      streamSkipUntil('\n');  // Refresh network name by network
+      char dest[128];
+      streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
+//      streamSkipUntil('\n');  // Refresh network name by network
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Network name updated.")
+      DBGLOG(Info, "\n\n{TinyGsmSim7080} Network name updated, *PSNWID: %s\n\n", dest)
       return true;
     } else if (data.endsWith(GF("*PSUTTZ:"))) {
       char dest[32];
       streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
 //      streamSkipUntil('\n');  // Refresh time and time zone by network
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Network time and time zone updated, *PSUTTZ: %s", dest)
+      DBGLOG(Info, "\n\n{TinyGsmSim7080} Network time and time zone updated, *PSUTTZ: %s\n\n", dest)
       return true;
 //    } else if (data.endsWith(GF("+CTZV:"))) {
     } else if (data.endsWith(GF("CTZV:"))) {
@@ -1169,13 +1171,13 @@ end:
       streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
 //      streamSkipUntil('\n');  // Refresh network time zone by network
       data = "";
-      DBGLOG(Info, "{TinyGsmSim7080} Network time zone updated, +CTZV: %s", dest)
+      DBGLOG(Info, "\n\n{TinyGsmSim7080} Network time zone updated, +CTZV: %s\n\n", dest)
       return true;
     } else if (data.endsWith(GF("DST: "))) {
       int dst = streamGetIntBefore('\n');  // Refresh time zone by network
       data = "";
       DBGCHK(Error, (dst == 0) || (dst == 1), "{TinyGsmSim7080} Daylight savings time state updated, DST out of range: %i", dst)
-      DBGCHK(Info, !((dst == 0) || (dst == 1)), "{TinyGsmSim7080} Daylight savings time state updated, DST: %i", dst)
+      DBGCHK(Info, !((dst == 0) || (dst == 1)), "\n\n{TinyGsmSim7080} Daylight savings time state updated, DST: %i\n\n", dst)
       if ((dst == 0) || (dst == 1)) { 
         dayLightSaving = dst;
       }
