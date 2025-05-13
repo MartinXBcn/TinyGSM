@@ -355,7 +355,12 @@ class TinyGsmTCP {
     }
 
     modemType* at;
+
+// <MS>
+public:    
     uint8_t    mux;
+
+protected:    
     uint16_t   sock_available;
     uint32_t   prev_check;
     bool       sock_connected;
