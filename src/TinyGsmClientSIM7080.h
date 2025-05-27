@@ -67,10 +67,12 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     friend class TinyGsmSim7080;
 
    public:
+    const char* TAG = "[GsmClientSim7080] ";
+
     GsmClientSim7080() {
-      DBGLOG(Info, "[GsmClientSim7080] >>")
-      DBGLOG(Info, "[GsmClientSim7080] ATTENTION: constructor does not do anything!")
-      DBGLOG(Info, "[GsmClientSim7080] <<")
+      DBGLOG(Info, "%s>>", TAG)
+      DBGLOG(Info, "%sATTENTION: constructor does not do anything!", TAG)
+      DBGLOG(Info, "%s<<", TAG)
     }
 
     explicit GsmClientSim7080(TinyGsmSim7080& modem, uint8_t mux = 0) {
@@ -78,13 +80,13 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 
     ~GsmClientSim7080() {
-      DBGLOG(Info, "[GsmClientSim7080] >> mux: ", mux)
+      DBGLOG(Info, "%s>> mux: ", TAG, mux)
       at->sockets[this->mux] = NULL;
-      DBGLOG(Info, "[GsmClientSim7080] <<")
+      DBGLOG(Info, "%s<<", TAG)
     }
 
     bool init(TinyGsmSim7080* modem, uint8_t mux = 0) {
-      DBGLOG(Info, "[GsmClientSim7080] >> mux: %hhu", mux)
+      DBGLOG(Info, "%s>> mux: %hhu", TAG, mux)
       this->at       = modem;
       sock_available = 0;
       prev_check     = 0;
@@ -102,22 +104,22 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         at->sockets[this->mux] = this;
         r = true;
       } else {
-        DBGLOG(Warn, "[GsmClientSim7080] ERROR.")
+        DBGLOG(Warn, "%sERROR.", TAG)
         r = false;
       }
-      DBGLOG(Info, "[GsmClientSim7080] << return: %s", DBGB2S(r))
+      DBGLOG(Info, "%s<< return: %s", TAG, DBGB2S(r))
       return r;
     } // bool GsmClientSim7080::init(...)
 
    public:
     // virtual 
     int connect(const char* host, uint16_t port, int timeout_s) {
-      DBGLOG(Info, "[GsmClientSim7080] >>")
+      DBGLOG(Info, "%s>> (mux: %hhu)", TAG, mux)
       stop();
       TINY_GSM_YIELD();
       rx.clear();
       sock_connected = at->modemConnect(host, port, mux, false, timeout_s);
-      DBGLOG(Info, "[GsmClientSim7080] << return sock_connected: %s", DBGB2S(sock_connected))
+      DBGLOG(Info, "%s<< (mux: %hhu) return sock_connected: %s", TAG, mux, DBGB2S(sock_connected))
       return sock_connected;
     } // int GsmClientSim7080::connect(...)
     TINY_GSM_CLIENT_CONNECT_OVERRIDES
@@ -131,7 +133,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 */
     void stop(uint32_t maxWaitMs) {
-      DBGLOG(Info, "[GsmClientSim7080] >>")
+      DBGLOG(Info, "%s>> (mux: %hhu)", TAG, mux)
 
       dumpModemBuffer(maxWaitMs);
 
@@ -143,7 +145,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
       MS_TINY_GSM_SEM_GIVE_WAIT
 
-      DBGLOG(Info, "[GsmClientSim7080] <<")
+      DBGLOG(Info, "%s<< (mux: %hhu)", TAG, mux)
     } // GsmClientSim7080::stop(...)
     
     void stop() override {
