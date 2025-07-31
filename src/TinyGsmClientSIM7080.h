@@ -854,7 +854,7 @@ DBGCOD(
 
     ret = (0 == res);
 
-    DBGCHK(Error, ret, "[TinyGsmSim7080] (mux: %hhu) Result of +CAOPEN: %hhi-%s", mux, DBGB2S(ret), res, getCaopenResultText(res))
+    DBGCHK(Error, ret, "[TinyGsmSim7080] (mux: %hhu) Result of +CAOPEN: %hhi-%s", mux, res, getCaopenResultText(res))
 
 end:
     MS_TINY_GSM_SEM_GIVE_WAIT
