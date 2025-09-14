@@ -47,7 +47,7 @@
 
 // Logging
 #undef MS_LOGGER_LEVEL
-#ifdef MS_TINYGSM_LOGGING
+#if defined(MS_TINYGSM_LOGGING) && defined(MS_LOGGER_ON)
 #define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
 #endif
 #include "ESP32Logger.h"

@@ -32,7 +32,7 @@
 
 // Logging
 #undef MS_LOGGER_LEVEL
-#ifdef MS_TINYGSM_LOGGING
+#if defined(MS_TINYGSM_LOGGING) && defined(MS_LOGGER_ON)
 #define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
 #endif
 #include "ESP32Logger.h"
@@ -893,7 +893,7 @@ end:
     DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) >> size: %u", mux, size);
     DBGCHK(Error, sockets[mux] != nullptr, "[TinyGsmSim7080] (#%hhu) socket #%hhu does not exist!", mux, mux)
     if (!sockets[mux]) { return 0; }
-    DBGCOD(char* tmp = new char[TINY_GSM_RX_BUFFER]; tmp[0] = '\0';)
+//    DBGCOD(char* tmp = new char[TINY_GSM_RX_BUFFER]; tmp[0] = '\0';)
 
     MS_TINY_GSM_SEM_TAKE_WAIT("modemRead")
 
@@ -938,12 +938,12 @@ end:
         TINY_GSM_YIELD();
       }
       char c = stream.read();
-      DBGCOD(tmp[i] = c;)
+//      DBGCOD(tmp[i] = c;)
       sockets[mux]->rx.put(c);
     } // for i
     DBGCHK(Error, i == len_confirmed, "[TinyGsmSim7080] i(%i) != len_confirmed(%" PRIi16 "), i.e. time-out.", i, len_confirmed)
-    DBGCOD(tmp[i] = '\0';)
-    DBGLOG(Debug,"[TinyGsmSim7080] (#%hhu) Read: \n%s\n", mux, tmp)
+//    DBGCOD(tmp[i] = '\0';)
+//    DBGLOG(Debug,"[TinyGsmSim7080] (#%hhu) Read: \n%s\n", mux, tmp)
     waitResponse();
     // make sure the sock available number is accurate again
     sockets[mux]->sock_available = modemGetAvailable(mux);
@@ -953,7 +953,7 @@ end:
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGCOD(delete[] tmp;)
+//    DBGCOD(delete[] tmp;)
     DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u,  sock_available: %" PRIu16, mux, _size, sockets[mux]->sock_available);
     return _size;
   } // ::modemRead(...)
