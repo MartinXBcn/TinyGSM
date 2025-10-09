@@ -513,6 +513,9 @@ class TinyGsmModem {
 
   inline int16_t streamGetIntLength(int8_t         numChars,
                                     const uint32_t timeout_ms = 1000L) {
+    DBGCHK(Error, numChars >= 0, "numChars must be >= 0")
+    if (numChars < 0) { return -9999; }
+    
     char buf[numChars + 1];
     if (streamGetLength(buf, numChars, timeout_ms)) {
       buf[numChars] = '\0';
@@ -538,6 +541,9 @@ class TinyGsmModem {
 
   inline float streamGetFloatLength(int8_t         numChars,
                                     const uint32_t timeout_ms = 1000L) {
+    DBGCHK(Error, numChars >= 0, "numChars must be >= 0")
+    if (numChars < 0) { return -9999.0F; }
+    
     char buf[numChars + 1];
     if (streamGetLength(buf, numChars, timeout_ms)) {
       buf[numChars] = '\0';

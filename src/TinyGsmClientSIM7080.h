@@ -80,7 +80,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     }
 
     ~GsmClientSim7080() {
-      DBGLOG(Info, "%s>> mux: ", TAG, mux)
+      DBGLOG(Info, "%s>> mux: %hhu", TAG, mux)
       at->sockets[this->mux] = NULL;
       DBGLOG(Info, "%s<<", TAG)
     }
@@ -220,6 +220,22 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     DBGCHK(Error, msTinyGsmSemCriticalProcess != NULL, "[TinyGsmSim7080] CRITICAL ERROR msTinyGsmSemCriticalProcess can not be created!");
     DBGLOG(Info, "[TinyGsmSim7080] <<");
   } // TinyGsmSim7080::TinyGsmSim7080(...)
+
+  ~TinyGsmSim7080() {
+    DBGLOG(Info, "[TinyGsmSim7080] >>");
+    for (int mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
+      GsmClientSim7080* sock = sockets[mux];
+      if (sock) {
+        delete sock;
+        sockets[mux] = NULL;
+      }
+    }
+    if (msTinyGsmSemCriticalProcess) {
+      vSemaphoreDelete(msTinyGsmSemCriticalProcess);
+      msTinyGsmSemCriticalProcess = NULL;
+    }
+    DBGLOG(Info, "[TinyGsmSim7080] <<");
+  } // TinyGsmSim7080::~TinyGsmSim7080()
 
   /*
    * Basic functions
@@ -866,6 +882,7 @@ end:
 
   int16_t modemSend(const void* buff, size_t len, uint8_t mux) {
     DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux)
+    DBGCHK(Error, len < UINT16_MAX, "[TinyGsmSim7080] (#%hhu) len(%u) >= UINT16_MAX(%i)!", mux, len, UINT16_MAX)
 
     MS_TINY_GSM_SEM_TAKE_WAIT("modemSend")
 
@@ -978,6 +995,13 @@ end:
         int               ret_mux = streamGetIntBefore(',');
         size_t            result  = streamGetIntBefore('\n');
 
+        if (ret_mux < 0 || ret_mux >= TINY_GSM_MUX_COUNT) {
+          DBGLOG(Error, 
+            "[TinyGsmSim7080] (mux: %hhu) ret_mux out of range: %i (range: 0..%i), result: %u", 
+            mux, ret_mux, TINY_GSM_MUX_COUNT - 1, result);
+          continue;
+        }
+
         result_sum += result;
 
         DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=1: ret_mux: %i, available: %u", mux, muxNo, ret_mux, result);
@@ -1054,6 +1078,13 @@ end:
       if (res == 1) {
         int    ret_mux = streamGetIntBefore(',');
         size_t status  = streamGetIntBefore('\n');
+
+        if (ret_mux < 0 || ret_mux >= TINY_GSM_MUX_COUNT) {
+          DBGLOG(Error, 
+            "[TinyGsmSim7080] (mux: %hhu) ret_mux out of range: %i (range: 0..%i), status: %u", 
+            mux, ret_mux, TINY_GSM_MUX_COUNT - 1, status);
+          continue;
+        }
 
         DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=ok: ret_mux: %i, status: %u-%s", 
           mux, muxNo, ret_mux, status,
