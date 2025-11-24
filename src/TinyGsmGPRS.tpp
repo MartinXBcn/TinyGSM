@@ -239,7 +239,7 @@ class TinyGsmGPRS {
       
       goto end; 
     }
-    res = thisModem().streamGetIntBefore('\n');
+    res = thisModem().streamGetInt8Before('\n');
     thisModem().waitResponse();
 
     // localIP() also blocks, therefore "give" already here.

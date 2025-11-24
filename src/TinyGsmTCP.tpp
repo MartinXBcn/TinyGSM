@@ -187,7 +187,7 @@ class TinyGsmTCP {
         }
         at->maintain();
       }
-      return static_cast<uint16_t>(rx.size()) + sock_available;
+      return static_cast<int>(rx.size() + sock_available);
 
 #else
 #error Modem client has been incorrectly created
@@ -247,7 +247,7 @@ class TinyGsmTCP {
       while (cnt < size) {
         size_t chunk = TinyGsmMin(size - cnt, rx.size());
         if (chunk > 0) {
-          rx.get(buf, chunk);
+          rx.get(buf, static_cast<int>(chunk));
           buf += chunk;
           cnt += chunk;
           continue;
@@ -262,8 +262,7 @@ class TinyGsmTCP {
         // TODO(vshymanskyy): Read directly into user buffer?
         at->maintain();
         if (sock_available > 0) {
-          int n = at->modemRead(TinyGsmMin((uint16_t)rx.free(), sock_available),
-                                mux);
+          size_t n = at->modemRead(TinyGsmMin((size_t)rx.free(), sock_available), mux);
           if (n == 0) break;
         } else {
           break;
@@ -271,7 +270,7 @@ class TinyGsmTCP {
       }
 
       DBGLOG(Verbose, "[TinyGsmTCP] << cnt: %u", cnt)
-      return cnt;
+      return static_cast<int>(cnt);
 
 #else
 #error Modem client has been incorrectly created
@@ -340,7 +339,7 @@ class TinyGsmTCP {
       uint32_t startMillis = millis();
       while (sock_available > 0 && (millis() - startMillis < maxWaitMs)) {
         rx.clear();
-        at->modemRead(TinyGsmMin((uint16_t)rx.free(), sock_available), mux);
+        at->modemRead(TinyGsmMin((size_t)rx.free(), sock_available), mux);
       }
       rx.clear();
       at->streamClear();
@@ -361,7 +360,7 @@ public:
     uint8_t    mux;
 
 protected:    
-    uint16_t   sock_available;
+    size_t   sock_available;
     uint32_t   prev_check;
     bool       sock_connected;
     bool       got_data;

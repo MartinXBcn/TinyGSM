@@ -114,7 +114,7 @@ class TinyGsmGSMLocation {
     thisModem().sendAT(GF("+CLBS=1,1"));
     // Should get a location code of "0" indicating success
     if (thisModem().waitResponse(120000L, GF("+CLBS: ")) != 1) { return ""; }
-    int8_t locationCode = thisModem().streamGetIntLength(2);
+    int8_t locationCode = static_cast<int8_t>(thisModem().streamGetIntLength(2));
     // 0 = success, else, error
     if (locationCode != 0) {
       thisModem().waitResponse();  // should be an ok after the error
@@ -136,7 +136,7 @@ class TinyGsmGSMLocation {
     thisModem().sendAT(GF("+CLBS=4,1"));
     // Should get a location code of "0" indicating success
     if (thisModem().waitResponse(120000L, GF("+CLBS: ")) != 1) { return false; }
-    int8_t locationCode = thisModem().streamGetIntLength(2);
+    int8_t locationCode = static_cast<int8_t>(thisModem().streamGetIntLength(2));
     // 0 = success, else, error
     if (locationCode != 0) {
       thisModem().waitResponse();  // should be an ok after the error
@@ -156,15 +156,16 @@ class TinyGsmGSMLocation {
 
     ilat      = thisModem().streamGetFloatBefore(',');  // Latitude
     ilon      = thisModem().streamGetFloatBefore(',');  // Longitude
-    iaccuracy = thisModem().streamGetIntBefore(',');    // Positioning accuracy
+//    iaccuracy = thisModem().streamGetIntBefore(',');    // Positioning accuracy
+    iaccuracy = thisModem().streamGetFloatBefore(',');    // Positioning accuracy
 
     // Date & Time
-    iyear  = thisModem().streamGetIntBefore('/');
-    imonth = thisModem().streamGetIntBefore('/');
-    iday   = thisModem().streamGetIntBefore(',');
-    ihour  = thisModem().streamGetIntBefore(':');
-    imin   = thisModem().streamGetIntBefore(':');
-    isec   = thisModem().streamGetIntBefore('\n');
+    iyear  = thisModem().streamGetIntegerBefore('/');
+    imonth = thisModem().streamGetIntegerBefore('/');
+    iday   = thisModem().streamGetIntegerBefore(',');
+    ihour  = thisModem().streamGetIntegerBefore(':');
+    imin   = thisModem().streamGetIntegerBefore(':');
+    isec   = thisModem().streamGetIntegerBefore('\n');
 
     // Set pointers
     if (lat != nullptr) *lat = ilat;

@@ -165,14 +165,14 @@ class TinyGsmTime {
     }
 
     // Date & Time
-    iyear       = thisModem().streamGetIntBefore('/');
-    imonth      = thisModem().streamGetIntBefore('/');
-    iday        = thisModem().streamGetIntBefore(',');
-    ihour       = thisModem().streamGetIntBefore(':');
-    imin        = thisModem().streamGetIntBefore(':');
+    iyear       = thisModem().streamGetIntegerBefore('/');
+    imonth      = thisModem().streamGetIntegerBefore('/');
+    iday        = thisModem().streamGetIntegerBefore(',');
+    ihour       = thisModem().streamGetIntegerBefore(':');
+    imin        = thisModem().streamGetIntegerBefore(':');
     isec        = thisModem().streamGetIntLength(2);
-    tzSign      = thisModem().stream.read();
-    itimezone   = thisModem().streamGetIntBefore('\n');
+    tzSign      = static_cast<char>(thisModem().stream.read());
+    itimezone   = thisModem().streamGetIntegerBefore('\n');
     if (tzSign == '-') { itimezone = itimezone * -1; }
 
     // Set pointers
@@ -183,7 +183,8 @@ class TinyGsmTime {
     if (hour != nullptr) *hour = ihour;
     if (minute != nullptr) *minute = imin;
     if (second != nullptr) *second = isec;
-    if (timezone != nullptr) *timezone = static_cast<float>(itimezone) / 4.0;
+//    if (timezone != nullptr) *timezone = static_cast<float>(itimezone) / 4.0;
+    if (timezone != nullptr) *timezone = static_cast<float>(itimezone / 4.0);
 
     // Final OK
     thisModem().waitResponse();

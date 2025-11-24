@@ -75,8 +75,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       DBGLOG(Info, "%s<<", TAG)
     }
 
-    explicit GsmClientSim7080(TinyGsmSim7080& modem, uint8_t mux = 0) {
-      init(&modem, mux);
+    explicit GsmClientSim7080(TinyGsmSim7080& _modem, uint8_t _mux = 0) {
+      init(&_modem, _mux);
     }
 
     ~GsmClientSim7080() {
@@ -85,18 +85,18 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       DBGLOG(Info, "%s<<", TAG)
     }
 
-    bool init(TinyGsmSim7080* modem, uint8_t mux = 0) {
-      DBGLOG(Info, "%s>> mux: %hhu", TAG, mux)
-      this->at       = modem;
+    bool init(TinyGsmSim7080* _modem, uint8_t _mux = 0) {
+      DBGLOG(Info, "%s>> _mux: %hhu", TAG, _mux)
+      this->at       = _modem;
       sock_available = 0;
       prev_check     = 0;
       sock_connected = false;
       got_data       = false;
 
-      if (mux < TINY_GSM_MUX_COUNT) {
-        this->mux = mux;
+      if (_mux < TINY_GSM_MUX_COUNT) {
+        this->mux = _mux;
       } else {
-        this->mux = (mux % TINY_GSM_MUX_COUNT);
+        this->mux = (_mux % TINY_GSM_MUX_COUNT);
       }
 
       bool r = false;
@@ -173,9 +173,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       DBGLOG(Info, "[GsmClientSecureSIM7080] <<")
     }
 
-    explicit GsmClientSecureSIM7080(TinyGsmSim7080& modem, uint8_t mux = 0)
-        : GsmClientSim7080(modem, mux) {
-      DBGLOG(Info, "[GsmClientSecureSIM7080] >> mux: %hhu", mux)
+    explicit GsmClientSecureSIM7080(TinyGsmSim7080& _modem, uint8_t _mux = 0)
+        : GsmClientSim7080(_modem, _mux) {
+      DBGLOG(Info, "[GsmClientSecureSIM7080] >> _mux: %hhu", _mux)
       DBGLOG(Info, "[GsmClientSecureSIM7080] <<")
     }
 
@@ -212,8 +212,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
    * Constructor
    */
  public:
-  explicit TinyGsmSim7080(Stream& stream)
-      : TinyGsmSim70xx<TinyGsmSim7080>(stream) {
+  explicit TinyGsmSim7080(Stream& _stream)
+      : TinyGsmSim70xx<TinyGsmSim7080>(_stream) {
     DBGLOG(Info, "[TinyGsmSim7080] >>");
     memset(sockets, 0, sizeof(sockets));
     msTinyGsmSemCriticalProcess = xSemaphoreCreateMutex();
@@ -223,7 +223,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
   ~TinyGsmSim7080() {
     DBGLOG(Info, "[TinyGsmSim7080] >>");
-    for (int mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
+    for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
       GsmClientSim7080* sock = sockets[mux];
       if (sock) {
         delete sock;
@@ -352,7 +352,7 @@ endxx:
     xSemaphoreTake(msTinyGsmSemCriticalProcess, portMAX_DELAY);
 
     bool check_socks = false;
-    for (int mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
+    for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
       GsmClientSim7080* sock = sockets[mux];
       if (sock && sock->got_data) {
         sock->got_data = false;
@@ -390,7 +390,7 @@ endxx:
     for (uint32_t start = millis(); millis() - start < 10000L;) {
       sendAT(GF(""));
       resp = waitResponse(200L, s, GFP(GSM_OK), GFP(GSM_ERROR), GF("AT"));
-      DBGLOG(Info, "[TinyGsmSim7080] Empty AT returned: %i, %s", resp, s.c_str());
+      DBGLOG(Info, "[TinyGsmSim7080] Empty AT returned: %hhi, %s", resp, s.c_str());
       if (resp == 1) {
         gotATOK = true;
         break;
@@ -625,7 +625,7 @@ end:
  protected:
   byte NTPServerSyncImpl(String server = "pool.ntp.org", int TimeZone = 0) {
     DBGLOG(Info, "[TinyGsmSim7080] >> server: %s, TimeZone: %i", server.c_str(), TimeZone);
-    byte r = -1;
+    byte r = 0xFF;
 
     MS_TINY_GSM_SEM_TAKE_WAIT("NTPServerSyncImpl")
 
@@ -650,9 +650,14 @@ end:
       // Check for ',' in case the module appends the time next to the return
       // code. Eg: +CNTP: <code>[,<time>]
       int index = result.indexOf(',');
-      if (index > 0) { result.remove(index); }
+      if (index > 0) { result.remove(static_cast<unsigned int>(index)); }
       result.trim();
-      if (TinyGsmIsValidNumber(result)) { r = result.toInt(); goto end; }
+      if (TinyGsmIsValidNumber(result)) { 
+        long rx = result.toInt(); 
+        DBGCHX(Error, rx <= 0xFF, "rx > 0xFF: %ld", "rx: %ld", rx)
+        r = static_cast<byte>(rx);
+        goto end; 
+      }
     } else {
       DBGLOG(Error, "[TinyGsmSim7080] ERROR: Request network syncrhonisation failed.");
     }
@@ -865,7 +870,7 @@ DBGCOD(
     streamSkipUntil(',');  // Skip mux
 
     // make sure the connection really opened
-    res = streamGetIntBefore('\n');
+    res = streamGetInt8Before('\n');
     waitResponse();
 
     ret = (0 == res);
@@ -880,7 +885,7 @@ end:
     return ret;
   } // ::modemConnect(...)
 
-  int16_t modemSend(const void* buff, size_t len, uint8_t mux) {
+  size_t modemSend(const void* buff, size_t len, uint8_t mux) {
     DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux)
     DBGCHK(Error, len < UINT16_MAX, "[TinyGsmSim7080] (#%hhu) len(%u) >= UINT16_MAX(%i)!", mux, len, UINT16_MAX)
 
@@ -892,8 +897,8 @@ end:
     sendAT(GF("+CASEND="), mux, ',', (uint16_t)len);
     if (waitResponse(GF(">")) != 1) { _len = 0; goto end; }
 
-    stream.write(reinterpret_cast<const uint8_t*>(buff), len);
-    _len = len;
+    _len = stream.write(reinterpret_cast<const uint8_t*>(buff), len);
+    DBGCHK(Error, _len == len, "stream.write: _len(%u) != len(%u)", _len, len)
     stream.flush();
 
     // OK after posting data
@@ -914,7 +919,7 @@ end:
 
     MS_TINY_GSM_SEM_TAKE_WAIT("modemRead")
 
-    int16_t len_confirmed;
+    long len_confirmed;
     size_t _size = size;
     int i;
     uint32_t startMillis;
@@ -939,7 +944,7 @@ end:
     // characters available, but in tests only the number is returned
 
     len_confirmed = stream.parseInt();
-    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) len_confirmed: %hi", mux, len_confirmed)
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) len_confirmed: %ld", mux, len_confirmed)
     streamSkipUntil(',');  // skip the comma
     if (len_confirmed <= 0) {
       waitResponse();
@@ -954,18 +959,19 @@ end:
              (millis() - startMillis < sockets[mux]->_timeout)) {
         TINY_GSM_YIELD();
       }
-      char c = stream.read();
-//      DBGCOD(tmp[i] = c;)
+      int iread = stream.read();
+      DBGCHK(Error, (iread >= 0) && (iread <= 0xFF), "iread out-of-range [0..0xFF]: %i", iread)
+      char c = static_cast<char>(iread);
       sockets[mux]->rx.put(c);
     } // for i
-    DBGCHK(Error, i == len_confirmed, "[TinyGsmSim7080] i(%i) != len_confirmed(%" PRIi16 "), i.e. time-out.", i, len_confirmed)
+    DBGCHK(Error, i == len_confirmed, "[TinyGsmSim7080] i(%i) != len_confirmed(%i), i.e. time-out.", i, len_confirmed)
 //    DBGCOD(tmp[i] = '\0';)
 //    DBGLOG(Debug,"[TinyGsmSim7080] (#%hhu) Read: \n%s\n", mux, tmp)
     waitResponse();
     // make sure the sock available number is accurate again
     sockets[mux]->sock_available = modemGetAvailable(mux);
 
-    _size = len_confirmed;
+    _size = static_cast<size_t>(len_confirmed);
 
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
@@ -986,32 +992,31 @@ end:
     // NOTE: This gets how many characters are available on all connections that
     // have data.  It does not return all the connections, just those with data.
     sendAT(GF("+CARECV?"));
-    for (int muxNo = 0; muxNo < TINY_GSM_MUX_COUNT; muxNo++) {
+    for (uint8_t muxNo = 0; muxNo < TINY_GSM_MUX_COUNT; muxNo++) {
       // after the last connection, there's an ok, so we catch it right away
       int res = waitResponse(3000, GF("+CARECV:"), GFP(GSM_OK), GFP(GSM_ERROR));
       // if we get the +CARECV: response, read the mux number and the number of
       // characters available
       if (res == 1) {
-        int               ret_mux = streamGetIntBefore(',');
-        size_t            result  = streamGetIntBefore('\n');
+        uint8_t ret_mux = streamGetUInt8Before(',');
+        size_t result  = streamGetSizeBefore('\n');
 
-        if (ret_mux < 0 || ret_mux >= TINY_GSM_MUX_COUNT) {
-          DBGLOG(Error, 
-            "[TinyGsmSim7080] (mux: %hhu) ret_mux out of range: %i (range: 0..%i), result: %u", 
+        if (ret_mux >= TINY_GSM_MUX_COUNT) {
+          DBGLOG(Error, "[TinyGsmSim7080] (mux: %hhu) ret_mux out of range: %hhu (range: 0..%i), result: %u", 
             mux, ret_mux, TINY_GSM_MUX_COUNT - 1, result);
           continue;
         }
 
         result_sum += result;
 
-        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=1: ret_mux: %i, available: %u", mux, muxNo, ret_mux, result);
+        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %hhu, res=1: ret_mux: %hhu, available: %u", mux, muxNo, ret_mux, result);
 
         GsmClientSim7080* sock    = sockets[ret_mux];
         if (sock) { sock->sock_available = result; }
         // if the first returned mux isn't 0 (or is higher than expected)
         // we need to fill in the missing muxes
         if (ret_mux > muxNo) {
-          for (int extra_mux = muxNo; extra_mux < ret_mux; extra_mux++) {
+          for (uint8_t extra_mux = muxNo; extra_mux < ret_mux; extra_mux++) {
             GsmClientSim7080* isock = sockets[extra_mux];
             if (isock) { isock->sock_available = 0; }
           }
@@ -1021,10 +1026,9 @@ end:
         // if we get an OK, we've reached the last socket with available data
         // so we set any we haven't gotten to yet to 0
 
-        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=2.", mux, muxNo);
+        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %hhu, res=2.", mux, muxNo);
 
-        for (int extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT;
-             extra_mux++) {
+        for (uint8_t extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT; extra_mux++) {
           GsmClientSim7080* isock = sockets[extra_mux];
           if (isock) { isock->sock_available = 0; }
         }
@@ -1070,23 +1074,21 @@ end:
     bool connected_sum = false;
 // <MS>        
 
-    for (int muxNo = 0; muxNo < TINY_GSM_MUX_COUNT; muxNo++) {
+    for (uint8_t muxNo = 0; muxNo < TINY_GSM_MUX_COUNT; muxNo++) {
       // after the last connection, there's an ok, so we catch it right away
-      int res = waitResponse(3000, GF("+CASTATE:"), GFP(GSM_OK),
-                             GFP(GSM_ERROR));
+      int8_t res = waitResponse(3000, GF("+CASTATE:"), GFP(GSM_OK), GFP(GSM_ERROR));
       // if we get the +CASTATE: response, read the mux number and the status
       if (res == 1) {
-        int    ret_mux = streamGetIntBefore(',');
-        size_t status  = streamGetIntBefore('\n');
+        uint8_t ret_mux = streamGetUInt8Before(',');
+        size_t status  = streamGetSizeBefore('\n');
 
-        if (ret_mux < 0 || ret_mux >= TINY_GSM_MUX_COUNT) {
-          DBGLOG(Error, 
-            "[TinyGsmSim7080] (mux: %hhu) ret_mux out of range: %i (range: 0..%i), status: %u", 
+        if (ret_mux >= TINY_GSM_MUX_COUNT) {
+          DBGLOG(Error, "[TinyGsmSim7080] (mux: %hhu) ret_mux out of range: %hhu (range: 0..%i), status: %u", 
             mux, ret_mux, TINY_GSM_MUX_COUNT - 1, status);
           continue;
         }
 
-        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %i, res=ok: ret_mux: %i, status: %u-%s", 
+        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %hhu, res=ok: ret_mux: %hhu, status: %u-%s", 
           mux, muxNo, ret_mux, status,
           (status == 0) ? "Closed by remote server or internal error" :
           (status == 1) ? "Connected to remote server" :
@@ -1116,17 +1118,16 @@ end:
         // if we get an OK, we've reached the last socket with available data
         // so we set any we haven't gotten to yet to 0
 
-        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) : muxNo: %i, res=error.", mux, muxNo)
+        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) : muxNo: %hhu, res=error.", mux, muxNo)
 
-        for (int extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT;
-             extra_mux++) {
+        for (uint8_t extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT; extra_mux++) {
           GsmClientSim7080* isock = sockets[extra_mux];
           if (isock) { isock->sock_connected = false; }
         }
         break;
       } else {
         // if we got an error, give up
-        DBGLOG(Warn, "[TinyGsmSim7080] (mux: %hhu) waitResponse() returned error: %i", mux, res)
+        DBGLOG(Warn, "[TinyGsmSim7080] (mux: %hhu) waitResponse() returned error: %hhi", mux, res)
         break;
       }
       // Should be a final OK at the end.
@@ -1156,31 +1157,31 @@ end:
  public:
   bool handleURCs(String& data) {
     if (data.endsWith(GF("+CARECV:"))) {
-      int8_t  mux = streamGetIntBefore(',');
-      int16_t len = streamGetIntBefore('\n');
-      if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
+      uint8_t  mux = streamGetUInt8Before(',');
+      size_t len = streamGetSizeBefore('\n');
+      if (mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
         sockets[mux]->got_data = true;
-        DBGCHK(Error, (len >= 0) && (len <=1024), "[TinyGsmSim7080] len (%hi) out of range [0..1024]!", len)
-        if (len >= 0 && len <= 1024) { sockets[mux]->sock_available = len; }
+        DBGCHK(Error, len <=1024, "[TinyGsmSim7080] len (%zu) out of range [0..1024]!", len)
+        if (len <= 1024) { sockets[mux]->sock_available = len; }
       }
       data = "";
-      DBGLOG(Debug, "{TinyGsmSim7080} Got Data on mux: %hhi, len: %hi", mux, len)
+      DBGLOG(Debug, "{TinyGsmSim7080} Got Data on mux: %hhu, len: %zu", mux, len)
       return true;
     } else if (data.endsWith(GF("+CADATAIND:"))) {
-      int8_t mux = streamGetIntBefore('\n');
-      if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
+      uint8_t mux = streamGetUInt8Before('\n');
+      if (mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
         sockets[mux]->got_data = true;
       }
       data = "";
-      DBGLOG(Debug, "{TinyGsmSim7080} Got Data on mux: %hhi.", mux)
+      DBGLOG(Debug, "{TinyGsmSim7080} Got Data on mux: %hhu.", mux)
       return true;
     } else if (data.endsWith(GF("+CASTATE:"))) {
-      int8_t mux   = streamGetIntBefore(',');
-      int8_t state = streamGetIntBefore('\n');
-      if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
+      uint8_t mux = streamGetUInt8Before(',');
+      int8_t state = streamGetInt8Before('\n');
+      if (mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
         if (state != 1) {
           sockets[mux]->sock_connected = false;
-          DBGLOG(Info, "{TinyGsmSim7080} Closed mux: %hhi", mux)
+          DBGLOG(Info, "{TinyGsmSim7080} Closed mux: %hhu", mux)
         }
       }
       data = "";
@@ -1208,7 +1209,7 @@ end:
       DBGLOG(Info, "\n\n{TinyGsmSim7080} Network time zone updated, +CTZV: %s\n\n", dest)
       return true;
     } else if (data.endsWith(GF("DST: "))) {
-      int dst = streamGetIntBefore('\n');  // Refresh time zone by network
+      int dst = streamGetIntegerBefore('\n');  // Refresh time zone by network
       data = "";
       DBGCHK(Error, (dst == 0) || (dst == 1), "{TinyGsmSim7080} Daylight savings time state updated, DST out of range: %i", dst)
       DBGCHK(Info, !((dst == 0) || (dst == 1)), "\n\n{TinyGsmSim7080} Daylight savings time state updated, DST: %i\n\n", dst)

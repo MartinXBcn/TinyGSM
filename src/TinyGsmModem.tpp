@@ -49,6 +49,9 @@ static const char GSM_VERBOSE[] TINY_GSM_PROGMEM   = AT_VERBOSE;
 static const char GSM_VERBOSE_2[] TINY_GSM_PROGMEM = AT_VERBOSE_2;
 #endif
 
+namespace {
+const char* tag_tgm = "[TinyGsmModem] ";
+}
 template <class modemType>
 class TinyGsmModem {
   /* =========================================== */
@@ -499,54 +502,95 @@ class TinyGsmModem {
     int8_t   numCharsReady = -1;
     uint32_t startMillis   = millis();
     while (millis() - startMillis < timeout_ms &&
-           (numCharsReady = thisModem().stream.available()) < numChars) {
+           (numCharsReady = static_cast<int8_t>(thisModem().stream.available())) < numChars) {
       TINY_GSM_YIELD();
     }
 
     if (numCharsReady >= numChars) {
-      thisModem().stream.readBytes(buf, numChars);
+      thisModem().stream.readBytes(buf, static_cast<size_t>(numChars));
       return true;
     }
 
     return false;
   }
 
-  inline int16_t streamGetIntLength(int8_t         numChars,
-                                    const uint32_t timeout_ms = 1000L) {
-    DBGCHK(Error, numChars >= 0, "numChars must be >= 0")
+  inline int streamGetIntLength(int8_t numChars, const uint32_t timeout_ms = 1000L) {
+    DBGCHK(Error, numChars >= 0, "%s""numChars must be >= 0", tag_tgm)
     if (numChars < 0) { return -9999; }
     
-    char buf[numChars + 1];
+    char buf[static_cast<unsigned int>(numChars) + 1];
     if (streamGetLength(buf, numChars, timeout_ms)) {
-      buf[numChars] = '\0';
+      buf[static_cast<unsigned int>(numChars)] = '\0';
       return atoi(buf);
     }
 
     return -9999;
   }
 
-  inline int16_t streamGetIntBefore(char lastChar) {
+  inline int streamGetIntegerBefore(char lastChar) {
     char   buf[7];
-    size_t bytesRead = thisModem().stream.readBytesUntil(
-        lastChar, buf, static_cast<size_t>(7));
+    size_t bytesRead = thisModem().stream.readBytesUntil(lastChar, buf, 7);
     // if we read 7 or more bytes, it's an overflow
     if (bytesRead && bytesRead < 7) {
       buf[bytesRead] = '\0';
-      int16_t res    = atoi(buf);
-      return res;
+      return atoi(buf);
     }
 
-    return -9999;
+    DBGLOG(Error, "%s""integer-overflow", tag_tgm)
+    return -1;
+  }
+
+  // Get int8_t
+  inline int8_t streamGetInt8Before(char lastChar) {
+    int i = streamGetIntegerBefore(lastChar);
+    if ((i >= -128) && (i <= 127)) {
+      return static_cast<int8_t>(i);
+    }
+
+    DBGLOG(Error, "%s""int8_t-out-of-range: %i", tag_tgm, i)
+    return -1;
+  }
+
+  // Get uint8_t
+  inline uint8_t streamGetUInt8Before(char lastChar) {
+    int i = streamGetIntegerBefore(lastChar);
+    if ((i >= 0) && (i <= 255)) {
+      return static_cast<uint8_t>(i);
+    }
+
+    DBGLOG(Error, "%s""uint8_t-out-of-range: %i", tag_tgm, i)
+    return 0xFF;
+  }
+
+  // Get int16_t
+  inline int16_t streamGetInt16Before(char lastChar) {
+    int i = streamGetIntegerBefore(lastChar);
+    if ((i >= -32768) && (i <= 32767)) {
+      return static_cast<int16_t>(i);
+    }
+
+    DBGLOG(Error, "%s""int16_t-out-of-range: %i", tag_tgm, i)
+    return -1;
+  }
+
+  // Get size_t
+  inline size_t streamGetSizeBefore(char lastChar) {
+    int i = streamGetIntegerBefore(lastChar);
+    if (i < 0) {
+      DBGLOG(Error, "%s""size_t cant be < 0: %i", tag_tgm, i)
+      i = 0;
+    }
+    return static_cast<size_t>(i);
   }
 
   inline float streamGetFloatLength(int8_t         numChars,
                                     const uint32_t timeout_ms = 1000L) {
-    DBGCHK(Error, numChars >= 0, "numChars must be >= 0")
+    DBGCHK(Error, numChars >= 0, "%s""numChars must be >= 0", tag_tgm)
     if (numChars < 0) { return -9999.0F; }
     
-    char buf[numChars + 1];
+    char buf[static_cast<unsigned int>(numChars) + 1];
     if (streamGetLength(buf, numChars, timeout_ms)) {
-      buf[numChars] = '\0';
+      buf[static_cast<unsigned int>(numChars)] = '\0';
       return atof(buf);
     }
 
@@ -560,7 +604,7 @@ class TinyGsmModem {
     // if we read 16 or more bytes, it's an overflow
     if (bytesRead && bytesRead < 16) {
       buf[bytesRead] = '\0';
-      float res      = atof(buf);
+      float res = static_cast<float>(atof(buf));
       return res;
     }
 
@@ -622,7 +666,9 @@ class TinyGsmModem {
         if (Part == 3) break;
       }
     }
-    return IPAddress(Parts[0], Parts[1], Parts[2], Parts[3]);
+    return IPAddress(
+      static_cast<uint8_t>(Parts[0]), static_cast<uint8_t>(Parts[1]), 
+      static_cast<uint8_t>(Parts[2]), static_cast<uint8_t>(Parts[3]));
   }
   /**@}*/
 
@@ -672,7 +718,7 @@ class TinyGsmModem {
         GF("> r5 <"), r5 ? r5 : GF("NULL"), GF("> r6 <"), r6 ? r6 : GF("NULL"),
         GF("> r7 <"), r7 ? r7 : GF("NULL"), '>');
 #endif
-    uint8_t  index       = 0;
+    int8_t index = 0;
     uint32_t startMillis = millis();
     ms_delay_timer = millis() + MS_WAITRESPONSE_DELAY_TIMER_INTERVAL;
     do {
@@ -683,8 +729,9 @@ class TinyGsmModem {
       TINY_GSM_YIELD();
       while (thisModem().stream.available() > 0) {
         TINY_GSM_YIELD();
-        int8_t a = thisModem().stream.read();
+        int a = thisModem().stream.read();
         if (a <= 0) continue;  // Skip 0x00 bytes, just in case
+        DBGCHK(Error, a <= 0xFF, "%s""stream.read() not valid, returned > 0xFF: %i", tag_tgm, a)
         data += static_cast<char>(a);
         if (r1 && data.endsWith(r1)) {
           index = 1;
@@ -764,10 +811,10 @@ class TinyGsmModem {
       TINY_GSM_YIELD();
       while (thisModem().stream.available() > 0) {
         TINY_GSM_YIELD();
-        int8_t a = thisModem().stream.read();
-        DBGLOG(Debug, "[TinyGsmModem] a: %3hhi-%c", a, a)
+        int a = thisModem().stream.read();
+        DBGLOG(Debug, "[TinyGsmModem] a: %i-%c", a, static_cast<char>(a))
         if (a <= 0) continue;  // Skip 0x00 bytes, just in case
-        data += (char)a;
+        data += static_cast<char>(a);
       } // while
     } while ((millis() - startMillis < timeout_ms) && (!data.contains(GF("OK"))));
     ret = data.contains(GF("OK"));
@@ -1066,7 +1113,7 @@ class TinyGsmModem {
     thisModem().streamSkipUntil(','); /* Skip format (0) */
     int status = thisModem().stream.parseInt();
     thisModem().waitResponse();
-    return status;
+    return static_cast<int8_t>(status);
   }
 
   bool waitForNetworkImpl(uint32_t timeout_ms   = 60000L,
@@ -1083,7 +1130,7 @@ class TinyGsmModem {
   int8_t getSignalQualityImpl() {
     thisModem().sendAT(GF("+CSQ"));
     if (thisModem().waitResponse(GF("+CSQ:")) != 1) { return 99; }
-    int8_t res = thisModem().streamGetIntBefore(',');
+    int8_t res = thisModem().streamGetInt8Before(',');
     thisModem().waitResponse();
     return res;
   }

@@ -117,7 +117,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
    * Constructor
    */
  public:
-  explicit TinyGsmSim70xx(Stream& stream) : stream(stream) {}
+  explicit TinyGsmSim70xx(Stream& _stream) : stream(_stream) {}
 
   /*
    * Basic functions
@@ -244,7 +244,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
     thisModem().sendAT(GF("+CNMP?"));
     if (thisModem().waitResponse(GF(AT_NL "+CNMP:")) != 1) {
     } else {
-        mode = thisModem().streamGetIntBefore('\n');
+        mode = thisModem().streamGetInt16Before('\n');
         thisModem().waitResponse();
     }
 
@@ -288,7 +288,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
     thisModem().sendAT(GF("+CMNB?"));
     if (thisModem().waitResponse(GF(AT_NL "+CMNB:")) != 1) {
     } else {
-      mode = thisModem().streamGetIntBefore('\n');
+      mode = thisModem().streamGetInt16Before('\n');
       thisModem().waitResponse();
     }
 
@@ -313,8 +313,8 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
 
     thisModem().sendAT(GF("+CNSMOD?"));
     if (thisModem().waitResponse(GF(AT_NL "+CNSMOD:")) != 1) { goto end; }
-    n    = thisModem().streamGetIntBefore(',') != 0;
-    stat = thisModem().streamGetIntBefore('\n');
+    n    = thisModem().streamGetIntegerBefore(',') != 0;
+    stat = thisModem().streamGetInt16Before('\n');
     thisModem().waitResponse();
 
 end:
@@ -495,13 +495,13 @@ end:
     thisModem().streamGetCharBefore(',', si.sCellID, sizeof(si.sCellID));
     thisModem().streamGetCharBefore(',', si.pCellID, sizeof(si.pCellID));
     thisModem().streamGetCharBefore(',', si.frequencyBand, sizeof(si.frequencyBand));
-    si.earfcn = thisModem().streamGetIntBefore(',');
-    si.dlbw = thisModem().streamGetIntBefore(',');
-    si.ulbw = thisModem().streamGetIntBefore(',');
-    si.RSRQ = thisModem().streamGetIntBefore(',');
-    si.RSRP = thisModem().streamGetIntBefore(',');
-    si.RSSI = thisModem().streamGetIntBefore(',');
-    si.RSSNR = thisModem().streamGetIntBefore('\n');
+    si.earfcn = thisModem().streamGetIntegerBefore(',');
+    si.dlbw = thisModem().streamGetIntegerBefore(',');
+    si.ulbw = thisModem().streamGetIntegerBefore(',');
+    si.RSRQ = thisModem().streamGetIntegerBefore(',');
+    si.RSRP = thisModem().streamGetIntegerBefore(',');
+    si.RSSI = thisModem().streamGetIntegerBefore(',');
+    si.RSSNR = thisModem().streamGetIntegerBefore('\n');
     thisModem().waitResponse();
 
     ret = true;
@@ -526,7 +526,7 @@ end:
 
     thisModem().sendAT(GF("+CGNAPN"));
     if (thisModem().waitResponse(GF(AT_NL "+CGNAPN: ")) != 1) goto end;
-    if (thisModem().streamGetIntBefore(',') != 1) goto end;
+    if (thisModem().streamGetIntegerBefore(',') != 1) goto end;
     thisModem().streamSkipUntil('"');
     thisModem().streamGetCharBefore('"', apn, maxlen);
     thisModem().waitResponse();

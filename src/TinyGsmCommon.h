@@ -16,7 +16,7 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 250051300
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 250112400
 
 
 // Logging
@@ -64,9 +64,9 @@ DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
 	{ \
 		DBGLOG(logLevelSemTinyGsmInfo, "### TINY_GSM ### <--- sem-give"); \
 		DBGCOD(ms_strncpy(msTinyGsmSemBlockedBy, "", 0, MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN);) \
-		DBGCOD(BaseType_t r =) \
+		DBGCOD(BaseType_t retx =) \
     xSemaphoreGive(msTinyGsmSemCriticalProcess); \
-		DBGCHK(Error, r == pdTRUE, "### TINY_GSM ### <--- sem-give returned error."); \
+		DBGCHK(Error, retx == pdTRUE, "### TINY_GSM ### <--- sem-give returned error."); \
     DBGCOD(strcpy(msTinyGsmSemBlockedBy, "");) \
 	} 
 

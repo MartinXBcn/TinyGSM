@@ -40,7 +40,7 @@ class TinyGsmFifo {
    */
   int free(void) {
     int s = _r - _w;     // Check if the read is ahead of the write
-    if (s <= 0) s += N;  // if not wrap
+    if (s <= 0) s += static_cast<int>(N);  // if not wrap
     return s - 1;  // return the difference between r and w, accounting for wrap
   }
 
@@ -104,8 +104,8 @@ class TinyGsmFifo {
 
   size_t size(void) {
     int s = _w - _r;
-    if (s < 0) s += N;
-    return s;
+    if (s < 0) s += static_cast<int>(N);
+    return static_cast<size_t>(s);
   }
 
   bool get(T* p) {
@@ -123,7 +123,7 @@ class TinyGsmFifo {
       int f;
       for (;;)  // wait for data
       {
-        f = size();
+        f = static_cast<int>(size());
         if (f) break;          // free space
         if (!t) return n - c;  // no space and not blocking
         /* nothing / just wait */;
@@ -131,10 +131,10 @@ class TinyGsmFifo {
       // check available data
       if (c < f) f = c;
       int r = _r;
-      int m = N - r;
+      int m = static_cast<int>(N) - r;
       // check wrap
       if (f > m) f = m;
-      memcpy(p, &_b[r], f);
+      memcpy(p, &_b[r], static_cast<size_t>(f));
       _r = _inc(r, f);
       c -= f;
       p += f;
@@ -156,7 +156,7 @@ class TinyGsmFifo {
    * @return *int*
    */
   int _inc(int i, int n = 1) {
-    return (i + n) % N;
+    return static_cast<int>(static_cast<unsigned int>(i + n) % N);
   }
 
   T   _b[N];  /// The buffer, containing 'N' items of type 'T'

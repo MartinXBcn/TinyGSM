@@ -171,7 +171,7 @@ class TinyGsmSMS {
   // Supported by: BG96, M95, MC60, SIM5360, SIM7000, SIM7600, SIM800
   class UTF8Print : public Print {
    public:
-    explicit UTF8Print(Print& p) : p(p) {}
+    explicit UTF8Print(Print& _p) : p(_p) {}
     size_t write(const uint8_t c) override {
       if (prv < 0xC0) {
         if (c < 0xC0) printHex(c);
