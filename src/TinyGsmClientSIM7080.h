@@ -915,7 +915,6 @@ end:
     DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) >> size: %u", mux, size);
     DBGCHK(Error, sockets[mux] != nullptr, "[TinyGsmSim7080] (#%hhu) socket #%hhu does not exist!", mux, mux)
     if (!sockets[mux]) { return 0; }
-//    DBGCOD(char* tmp = new char[TINY_GSM_RX_BUFFER]; tmp[0] = '\0';)
 
     MS_TINY_GSM_SEM_TAKE_WAIT("modemRead")
 
@@ -959,24 +958,33 @@ end:
              (millis() - startMillis < sockets[mux]->_timeout)) {
         TINY_GSM_YIELD();
       }
+      // <MS>
+      if (!stream.available()) {
+        DBGLOG(Error, "[TinyGsmSim7080] time-out! Stop reading.")
+        break;
+      }
+
       int iread = stream.read();
-      DBGCHK(Error, (iread >= 0) && (iread <= 0xFF), "iread out-of-range [0..0xFF]: %i", iread)
+
+      // <MS>
+      DBGCHK(Error, (iread >= 0) && (iread <= 0xFF), "[TinyGsmSim7080] iread out-of-range [0..0xFF]: %i! Stop reading.", iread)
+      if (iread < 0) break;
+
       char c = static_cast<char>(iread);
       sockets[mux]->rx.put(c);
     } // for i
-    DBGCHK(Error, i == len_confirmed, "[TinyGsmSim7080] i(%i) != len_confirmed(%i), i.e. time-out.", i, len_confirmed)
-//    DBGCOD(tmp[i] = '\0';)
-//    DBGLOG(Debug,"[TinyGsmSim7080] (#%hhu) Read: \n%s\n", mux, tmp)
+//    DBGCHK(Error, i == len_confirmed, "[TinyGsmSim7080] i(%i) != len_confirmed(%i), i.e. time-out, unexpected end.", i, len_confirmed)
     waitResponse();
     // make sure the sock available number is accurate again
     sockets[mux]->sock_available = modemGetAvailable(mux);
 
-    _size = static_cast<size_t>(len_confirmed);
+    // <MS>
+    //_size = static_cast<size_t>(len_confirmed);
+    _size = static_cast<size_t>(i);
 
   end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-//    DBGCOD(delete[] tmp;)
     DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u,  sock_available: %" PRIu16, mux, _size, sockets[mux]->sock_available);
     return _size;
   } // ::modemRead(...)

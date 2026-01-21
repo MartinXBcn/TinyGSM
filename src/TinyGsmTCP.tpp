@@ -280,9 +280,13 @@ class TinyGsmTCP {
     int read() override {
       DBGLOG(Verbose, "[TinyGsmTCP] >>")
 
-      uint8_t c;
+      uint8_t c = 0;
       int ret = -1;
-      if (read(&c, 1) == 1) { return c; }
+      if (read(&c, 1) == 1) { 
+        ret = c; 
+      } else {
+        DBGLOG(Error, "[TinyGsmTCP] read() failed!")
+      }
 
       DBGLOG(Verbose, "[TinyGsmTCP] << return %3i: '%c'", ret, (ret >= 32) && (ret < 127) ? c : '.')
       return ret;
