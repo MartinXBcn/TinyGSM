@@ -35,7 +35,7 @@ class TinyGsmGPRS {
   bool simUnlock(const char* pin) {
     bool b = false;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("simUnlock")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     b = thisModem().simUnlockImpl(pin);
 
@@ -47,7 +47,7 @@ class TinyGsmGPRS {
   String getSimCCID() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getSimCCID")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     s = thisModem().getSimCCIDImpl();
 
@@ -61,7 +61,7 @@ class TinyGsmGPRS {
   String getIMEI() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getIMEI")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     s = thisModem().getIMEIImpl();
 
@@ -75,7 +75,7 @@ class TinyGsmGPRS {
   String getIMSI() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getIMSI")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     s = thisModem().getIMSIImpl();
 
@@ -88,7 +88,7 @@ class TinyGsmGPRS {
   SimStatus getSimStatus(uint32_t timeout_ms = 10000L) {
     SimStatus simstatus;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getSimStatus")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     simstatus = thisModem().getSimStatusImpl(timeout_ms);
 
@@ -115,7 +115,7 @@ class TinyGsmGPRS {
   String getOperator() {
     String o;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getOperator")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     o = thisModem().getOperatorImpl();
 
@@ -128,7 +128,7 @@ class TinyGsmGPRS {
   String getProvider() {
     String p;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getOperator")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     p = thisModem().getProviderImpl();
 
@@ -228,7 +228,7 @@ class TinyGsmGPRS {
   bool isGprsConnectedImpl() {
     DBGLOG(Debug, "[TinyGsmGPRS] >>")
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("isGprsConnectedImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     int8_t res;
     bool ret = false;

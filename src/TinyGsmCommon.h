@@ -16,7 +16,7 @@
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 250112400
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 260012200
 
 
 // Logging
@@ -26,6 +26,99 @@
 #endif
 #include "ESP32Logger.h"
 
+
+
+
+
+
+
+
+
+
+// =======================================================
+// Semaphore "### TINY_GSM ###"
+
+#define logLevelSemTinyGsmInfo Debug
+#define logLevelSemTinyGsmWarn Debug
+#define logLevelSemTinyGsmError Debug
+
+#ifndef MS_TINY_GSM_SEM_WAIT_FOR_MS
+#define MS_TINY_GSM_SEM_WAIT_FOR_MS (ULONG_MAX)
+#endif
+
+extern SemaphoreHandle_t msTinyGsmSemProcess;
+
+#if defined(MS_LOGGER_ON)
+#define MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN 64
+extern char msTinyGsmSemBlockedByFunc[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];
+extern char msTinyGsmSemBlockedByFileName[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];
+extern int msTinyGsmSemBlockedByLineNumber;
+#endif
+
+// Check [msTinyGsmSemProcess] and wait if necessary until it becomes available.
+#define MS_TINY_GSM_SEM_TAKE_WAIT \
+	if (xSemaphoreTake(msTinyGsmSemProcess, 0) != pdTRUE) { \
+		DBGLOG( \
+			logLevelSemTinyGsmError, \
+			"### TINY_GSM ### ---> sem not available, wait until it becomes available. Blocked by: %s<%s:%i>", \
+			msTinyGsmSemBlockedByFunc, msTinyGsmSemBlockedByFileName, msTinyGsmSemBlockedByLineNumber) \
+		if (xSemaphoreTake(msTinyGsmSemProcess, ( TickType_t )(MS_TINY_GSM_SEM_WAIT_FOR_MS / portTICK_PERIOD_MS)) == pdTRUE) { \
+			DBGLOG(logLevelSemTinyGsmError, "### TINY_GSM ### ---> sem now available, proceed with code.") \
+		} else { \
+			DBGLOG(Fatal, "### TINY_GSM ### ---> sem-take returned error or time-out after ms: %u.", MS_TINY_GSM_SEM_WAIT_FOR_MS) \
+		} \
+	} else { \
+		DBGLOG(logLevelSemTinyGsmInfo, "### TINY_GSM ### ---> sem available, proceed with code.") \
+	} \
+	DBGCOD(ms_strncpy(msTinyGsmSemBlockedByFunc, __func__, strlen(__func__), MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN);) \
+	DBGCOD(ms_strncpy(msTinyGsmSemBlockedByFileName, __FILENAME__, strlen(__FILENAME__), MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN);) \
+	DBGCOD(msTinyGsmSemBlockedByLineNumber = __LINE__;) \
+
+// Check [msTinyGsmSemProcess] w/o waiting, if available proceed with program code,
+// otherwise skip program code w/o waiting.
+#define MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE \
+	if (xSemaphoreTake(msTinyGsmSemProcess, 0) != pdTRUE) { \
+		DBGLOG( \
+			logLevelSemTinyGsmWarn, \
+			"### TINY_GSM ### ---> sem not available, do not wait, skip. Blocked by: %s<%s:%i>", \
+			msTinyGsmSemBlockedByFunc, msTinyGsmSemBlockedByFileName, msTinyGsmSemBlockedByLineNumber) \
+	} else { \
+		DBGLOG(logLevelSemTinyGsmInfo, "### TINY_GSM ### ---> sem available, proceed with code.") \
+		DBGCOD(ms_strncpy(msTinyGsmSemBlockedByFunc, __func__, strlen(__func__), MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN);) \
+		DBGCOD(ms_strncpy(msTinyGsmSemBlockedByFileName, __FILENAME__, strlen(__FILENAME__), MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN);) \
+		DBGCOD(msTinyGsmSemBlockedByLineNumber = __LINE__;) \
+
+// End of a block started with [MS_TINY_GSM_SEM_TAKE_WAIT].
+#define MS_TINY_GSM_SEM_GIVE_WAIT \
+	{ \
+		DBGLOG(logLevelSemTinyGsmInfo, "### TINY_GSM ### <--- sem-give.") \
+		DBGCOD(strcpy(msTinyGsmSemBlockedByFunc, "");) \
+		DBGCOD(strcpy(msTinyGsmSemBlockedByFileName, "");) \
+		DBGCOD(msTinyGsmSemBlockedByLineNumber = 0;) \
+		DBGCOD(BaseType_t __r =) \
+    	xSemaphoreGive(msTinyGsmSemProcess); \
+		DBGCHK(Error, __r == pdTRUE, "### TINY_GSM ### <--- sem-give returned error.") \
+	} 
+
+// End of a block started with [MS_TINY_GSM_SEM_TAKE_IF_AVAILABLE].
+#define MS_TINY_GSM_SEM_GIVE_IF_AVAILABLE \
+		MS_TINY_GSM_SEM_GIVE_WAIT \
+	} 
+
+// Returns true if the semaphore is in use by an other function, 
+// or false if it is available.
+// Does not block anything, just checks.
+#define MS_TINY_GSM_SEM_BLOCKED \
+	(uxSemaphoreGetCount(msTinyGsmSemProcess) == 0)
+
+
+
+
+
+
+
+
+/*
 
 extern SemaphoreHandle_t msTinyGsmSemCriticalProcess;
 
@@ -81,27 +174,14 @@ DBGCOD(extern char msTinyGsmSemBlockedBy[MS_TINY_GSM_SEM_BLOCKEDBY_MAXLEN];)
 #define MS_TINY_GSM_SEM_BLOCKED \
 	(uxSemaphoreGetCount(msTinyGsmSemCriticalProcess) == 0)
 
+*/
+
 // <MS> <<
 
 
-
-
-
-#if defined(SPARK) || defined(PARTICLE)
-#include "Particle.h"
-#elif defined(ARDUINO)
-#if ARDUINO >= 100
 #include "Arduino.h"
-#else
-#include "WProgram.h"
-#endif
-#endif
-
-#if defined(ARDUINO_DASH)
-#include <ArduinoCompat/Client.h>
-#else
 #include <Client.h>
-#endif
+
 
 #ifndef TINY_GSM_YIELD_MS
 #define TINY_GSM_YIELD_MS 0

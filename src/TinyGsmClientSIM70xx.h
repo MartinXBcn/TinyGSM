@@ -193,7 +193,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
   SIM70xxRegStatus getRegistrationStatus() {
     DBGLOG(Info, "[TinyGsmSim70xx] >>")
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getRegistrationStatus")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     SIM70xxRegStatus epsStatus = (SIM70xxRegStatus)thisModem().getRegistrationStatusXREG("CEREG");
 
@@ -221,7 +221,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
   String getNetworkModes() {
     String res;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkModes")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     // Get the help string, not the setting value
     thisModem().sendAT(GF("+CNMP=?"));
@@ -239,7 +239,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
   int16_t getNetworkMode() {
     int16_t mode = 0;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkMode")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CNMP?"));
     if (thisModem().waitResponse(GF(AT_NL "+CNMP:")) != 1) {
@@ -265,7 +265,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
   String getPreferredModes() {
     String res;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getPreferredModes")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     // Get the help string, not the setting value
     thisModem().sendAT(GF("+CMNB=?"));
@@ -283,7 +283,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
   int16_t getPreferredMode() {
     int16_t mode = 0;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getPreferredMode")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CMNB?"));
     if (thisModem().waitResponse(GF(AT_NL "+CMNB:")) != 1) {
@@ -309,7 +309,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
     // n: whether to automatically report the system mode info
     // stat: the current service. 0 if it not connected
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkSystemMode")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CNSMOD?"));
     if (thisModem().waitResponse(GF(AT_NL "+CNSMOD:")) != 1) { goto end; }
@@ -475,7 +475,7 @@ end:
   bool getUserEquipmentSystemInfo(MsUserEquipmentSystemInfo& si) {
     bool ret = false;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getUserEquipmentSystemInfo")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CPSI?"));
     if (thisModem().waitResponse(GF(AT_NL "+CPSI: ")) != 1) goto end;
@@ -522,7 +522,7 @@ end:
     bool ret = false;
     apn[0] = 0;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkAPN")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CGNAPN"));
     if (thisModem().waitResponse(GF(AT_NL "+CGNAPN: ")) != 1) goto end;
@@ -548,7 +548,7 @@ end:
   bool reportNetlightStatus() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("reportNetlightStatus")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     DBGLOG(Info, "[TinyGsmSim70xx] AT+SLEDS=?")
     thisModem().sendAT(GF("+SLEDS=?"));
@@ -603,7 +603,7 @@ end:
     DBGCHK(Warn, (timerOff == 0) || (timerOff >= 40), "[TinyGsmSim70xx] Invalid timerOff (0 or 40..65535): %hu", timerOff)
     DBGLOG(Info, "[TinyGsmSim70xx] AT+SLEDS=%hhu,%hu,%hu", mode, timerOn, timerOff)
   
-    MS_TINY_GSM_SEM_TAKE_WAIT("setNetlightTimerPeriod")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+SLEDS="), mode, GF(","), timerOn, GF(","), timerOff);
     int8_t ret = thisModem().waitResponse(2000L);
@@ -627,7 +627,7 @@ end:
     DBGCHK(Warn, (mode >= 0) && (mode <= 1), "[TinyGsmSim70xx] Invalid mode: %hhu", mode)
     DBGLOG(Info, "[TinyGsmSim70xx] AT+CNETLIGHT=%hhu", mode)
   
-    MS_TINY_GSM_SEM_TAKE_WAIT("setNetlightOn")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CNETLIGHT="), mode);
     int8_t ret = thisModem().waitResponse(2000L);
@@ -651,7 +651,7 @@ end:
     DBGCHK(Warn, (mode >= 0) && (mode <= 2), "[TinyGsmSim70xx] Invalid mode: %hhu", mode)
     DBGLOG(Info, "[TinyGsmSim70xx] AT+CSGS=%hhu", mode)
   
-    MS_TINY_GSM_SEM_TAKE_WAIT("setNetlightIndication")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CSGS="), mode);
     int8_t ret = thisModem().waitResponse(2000L);
@@ -670,7 +670,7 @@ end:
   **/
   String getModemRevisionSoftwareRelease() {
   
-    MS_TINY_GSM_SEM_TAKE_WAIT("getModemRevisionSoftwareRelease")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CGMR"));
     String res;

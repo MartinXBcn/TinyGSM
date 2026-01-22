@@ -112,7 +112,7 @@ class TinyGsmModem {
   bool setBaud(uint32_t baud) {
     bool b;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("setBaud")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     b = thisModem().setBaudImpl(baud);
 
@@ -233,7 +233,7 @@ class TinyGsmModem {
   String getModemInfo() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getModemInfo")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     s = thisModem().getModemInfoImpl();
 
@@ -251,7 +251,7 @@ class TinyGsmModem {
   String getModemName() {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getModemName")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     s = thisModem().getModemNameImpl();
 
@@ -424,7 +424,7 @@ class TinyGsmModem {
   int16_t getSignalQuality() {
     int16_t i = 0;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getSignalQuality")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     i = thisModem().getSignalQualityImpl();
 

@@ -37,7 +37,7 @@ class TinyGsmTime {
   String getGSMDateTime(TinyGSMDateTimeFormat format) {
     String s;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getGSMDateTime")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     s = thisModem().getGSMDateTimeImpl(format);
 
@@ -64,7 +64,7 @@ class TinyGsmTime {
                       int* second, float* timezone) {
     bool b = false;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getNetworkTime")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     b = thisModem().getNetworkTimeImpl(year, month, day, hour, minute,
                                           second, timezone);

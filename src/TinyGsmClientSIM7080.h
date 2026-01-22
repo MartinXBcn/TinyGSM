@@ -137,7 +137,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
       dumpModemBuffer(maxWaitMs);
 
-      MS_TINY_GSM_SEM_TAKE_WAIT("stop")
+      MS_TINY_GSM_SEM_TAKE_WAIT
 
       at->sendAT(GF("+CACLOSE="), mux);
       sock_connected = false;
@@ -216,8 +216,8 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       : TinyGsmSim70xx<TinyGsmSim7080>(_stream) {
     DBGLOG(Info, "[TinyGsmSim7080] >>");
     memset(sockets, 0, sizeof(sockets));
-    msTinyGsmSemCriticalProcess = xSemaphoreCreateMutex();
-    DBGCHK(Error, msTinyGsmSemCriticalProcess != NULL, "[TinyGsmSim7080] CRITICAL ERROR msTinyGsmSemCriticalProcess can not be created!");
+    msTinyGsmSemProcess = xSemaphoreCreateMutex();
+    DBGCHK(Error, msTinyGsmSemProcess != NULL, "[TinyGsmSim7080] CRITICAL ERROR msTinyGsmSemProcess can not be created!");
     DBGLOG(Info, "[TinyGsmSim7080] <<");
   } // TinyGsmSim7080::TinyGsmSim7080(...)
 
@@ -230,9 +230,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
         sockets[mux] = NULL;
       }
     }
-    if (msTinyGsmSemCriticalProcess) {
-      vSemaphoreDelete(msTinyGsmSemCriticalProcess);
-      msTinyGsmSemCriticalProcess = NULL;
+    if (msTinyGsmSemProcess) {
+      vSemaphoreDelete(msTinyGsmSemProcess);
+      msTinyGsmSemProcess = NULL;
     }
     DBGLOG(Info, "[TinyGsmSim7080] <<");
   } // TinyGsmSim7080::~TinyGsmSim7080()
@@ -255,7 +255,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       goto endxx;
     }
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("initImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     initRunning = true;
 
@@ -346,10 +346,10 @@ endxx:
   void maintainImpl() {
     // Keep listening for modem URC's and proactively iterate through
     // sockets asking if any data is avaiable
-//    DBGLOG(Info, "[TinyGsmSim7080::maintainImpl] >>");
+    DBGLOG(Debug, "[TinyGsmSim7080::maintainImpl] >>");
 
-    // MS_TINY_GSM_SEM_TAKE_WAIT("maintainImpl")
-    xSemaphoreTake(msTinyGsmSemCriticalProcess, portMAX_DELAY);
+    MS_TINY_GSM_SEM_TAKE_WAIT
+    // xSemaphoreTake(msTinyGsmSemProcess, portMAX_DELAY);
 
     bool check_socks = false;
     for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
@@ -367,10 +367,10 @@ endxx:
 
     while (stream.available()) { waitResponse(15, nullptr, nullptr); }
 
-    // MS_TINY_GSM_SEM_GIVE_WAIT
-    xSemaphoreGive(msTinyGsmSemCriticalProcess); 
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    // xSemaphoreGive(msTinyGsmSemProcess); 
 
-//    DBGLOG(Info, "[TinyGsmSim7080::maintainImpl] <<");
+    DBGLOG(Debug, "[TinyGsmSim7080::maintainImpl] <<");
   } // TinyGsmSim7080::maintainImpl()
 
   /*
@@ -380,7 +380,7 @@ endxx:
   bool restartImpl(const char* pin = nullptr) {
     DBGLOG(Info, "[TinyGsmSim7080] >>");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getLocalIPImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     bool success = true;
     int8_t resp;
@@ -447,7 +447,7 @@ endxx:
   String getLocalIPImpl() {
     DBGLOG(Debug, "[TinyGsmSim7080] >>");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("getLocalIPImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     String res;
 
@@ -487,7 +487,7 @@ end:
     gprsDisconnect();
 
     // gprsDisconnect() has its own "blocking".
-    MS_TINY_GSM_SEM_TAKE_WAIT("gprsConnectImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     DBGLOG(Info, "[TinyGsmSim7080] -1- CGDCONT")
 
@@ -567,7 +567,7 @@ end:
     // CNACT will close *all* open application connections
     DBGLOG(Info, "[TinyGsmSim7080] >>");
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("gprsDisconnectImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     bool ret = false;
 
@@ -627,7 +627,7 @@ end:
     DBGLOG(Info, "[TinyGsmSim7080] >> server: %s, TimeZone: %i", server.c_str(), TimeZone);
     byte r = 0xFF;
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("NTPServerSyncImpl")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     // Set GPRS bearer profile to associate with NTP sync
     // this may fail, it's not supported by all modules
@@ -737,7 +737,7 @@ DBGCOD(
     DBGLOG(Info, "[TinyGsmSim7080] (mux: %hhu) >> host: '%s', port: %hu, ssl: %s, timeout: %is", 
       mux, host == nullptr ? "-" : host, port, DBGB2S(ssl), timeout_s)
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("modemConnect")
+    MS_TINY_GSM_SEM_TAKE_WAIT
     
     uint32_t timeout_ms = ((uint32_t)timeout_s) * 1000;
     bool ret = false;
@@ -889,7 +889,7 @@ end:
     DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux)
     DBGCHK(Error, len < UINT16_MAX, "[TinyGsmSim7080] (#%hhu) len(%u) >= UINT16_MAX(%i)!", mux, len, UINT16_MAX)
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("modemSend")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     size_t _len = len;
 
@@ -916,7 +916,7 @@ end:
     DBGCHK(Error, sockets[mux] != nullptr, "[TinyGsmSim7080] (#%hhu) socket #%hhu does not exist!", mux, mux)
     if (!sockets[mux]) { return 0; }
 
-    MS_TINY_GSM_SEM_TAKE_WAIT("modemRead")
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
     long len_confirmed;
     size_t _size = size;
