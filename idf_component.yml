@@ -1,0 +1,6 @@
+## IDF Component Manager Manifest File
+dependencies:
+  # Required IDF version
+  # https://github.com/espressif/esp-idf/releases
+  idf:
+    version: ">=5.5.2,<6.0.0"
