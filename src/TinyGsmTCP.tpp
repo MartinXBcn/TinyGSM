@@ -272,7 +272,20 @@ class TinyGsmTCP {
     }
 
     int peek() override {
-      return (uint8_t)rx.peek();
+      if (!rx.size()) {
+        available();
+
+#if defined(TINY_GSM_BUFFER_READ_NO_CHECK) || \
+        defined(TINY_GSM_BUFFER_READ_AND_CHECK_SIZE)
+        if (!rx.size() && sock_available > 0) {
+          at->modemRead(
+              TinyGsmMin(static_cast<size_t>(rx.free()), sock_available),
+              mux);
+        }
+#endif
+      }
+
+      return rx.size() ? static_cast<int>(rx.peek()) : -1;
     }
 
     void flush() override {

@@ -489,29 +489,33 @@ class TinyGsmModem {
   }
 
   inline void streamClear() {
+    MS_TINY_GSM_SEM_TAKE_WAIT
+
     while (thisModem().stream.available()) {
       thisModem().waitResponse(50, nullptr, nullptr);
     }
+
+    MS_TINY_GSM_SEM_GIVE_WAIT
   }
 
  protected:
   inline bool streamGetLength(char* buf, int8_t numChars,
                               const uint32_t timeout_ms = 1000L) {
-    if (!buf) { return false; }
+    if (!buf || numChars < 0) { return false; }
+    if (numChars == 0) { return true; }
 
-    int8_t   numCharsReady = -1;
-    uint32_t startMillis   = millis();
+    int numCharsReady = -1;
+    const uint32_t startMillis = millis();
+
     while (millis() - startMillis < timeout_ms &&
-           (numCharsReady = static_cast<int8_t>(thisModem().stream.available())) < numChars) {
+          (numCharsReady = thisModem().stream.available()) < numChars) {
       TINY_GSM_YIELD();
     }
 
-    if (numCharsReady >= numChars) {
-      thisModem().stream.readBytes(buf, static_cast<size_t>(numChars));
-      return true;
-    }
+    if (numCharsReady < numChars) { return false; }
 
-    return false;
+    const size_t requested = static_cast<size_t>(numChars);
+    return thisModem().stream.readBytes(buf, requested) == requested;
   }
 
   inline int streamGetIntLength(int8_t numChars, const uint32_t timeout_ms = 1000L) {
@@ -525,6 +529,11 @@ class TinyGsmModem {
     }
 
     return -9999;
+  }
+
+  // Compatibility wrapper for existing template implementations.
+  inline int streamGetIntBefore(char lastChar) {
+    return streamGetIntegerBefore(lastChar);
   }
 
   inline int streamGetIntegerBefore(char lastChar) {

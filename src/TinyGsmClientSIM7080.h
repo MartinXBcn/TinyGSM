@@ -69,11 +69,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
    public:
     const char* TAG = "[GsmClientSim7080] ";
 
-    GsmClientSim7080() {
-      DBGLOG(Info, "%s>>", TAG)
-      DBGLOG(Info, "%sATTENTION: constructor does not do anything!", TAG)
-      DBGLOG(Info, "%s<<", TAG)
-    }
+    GsmClientSim7080() = delete;
 
     explicit GsmClientSim7080(TinyGsmSim7080& _modem, uint8_t _mux = 0) {
       init(&_modem, _mux);
@@ -167,11 +163,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
  public:
   class GsmClientSecureSIM7080 : public GsmClientSim7080 {
    public:
-    GsmClientSecureSIM7080() {
-      DBGLOG(Info, "[GsmClientSecureSIM7080] >>")
-      DBGLOG(Info, "[GsmClientSecureSIM7080] ATTENTION: constructor does not do anything!")
-      DBGLOG(Info, "[GsmClientSecureSIM7080] <<")
-    }
+    GsmClientSecureSIM7080() = delete;
 
     explicit GsmClientSecureSIM7080(TinyGsmSim7080& _modem, uint8_t _mux = 0)
         : GsmClientSim7080(_modem, _mux) {
@@ -414,6 +406,7 @@ endxx:
 //    if (!setPhoneFunctionality(1, true)) { 
     if (!setPhoneFunctionality(1)) { 
       DBGLOG(Error, "[TinyGsmSim7080] Restart failed, setPhoneFunctionality(1, true) failed!")
+      success = false;
       goto end; 
     }
 
@@ -549,8 +542,9 @@ end:
     while (!res && ntries < 5) {
       DBGLOG(Info, "[TinyGsmSim7080] CNACT ntries: %i", ntries);
       sendAT(GF("+CNACT=0,1"));
-      res = waitResponse(60000L, GF(AT_NL "+APP PDP: 0,ACTIVE"),
-                         GF(AT_NL "+APP PDP: 0,DEACTIVE"));
+      res = (waitResponse(60000L, 
+                          GF(AT_NL "+APP PDP: 0,ACTIVE"),
+                          GF(AT_NL "+APP PDP: 0,DEACTIVE")) == 1);
       waitResponse();
       ntries++;
     }
@@ -1281,7 +1275,7 @@ end:
 
  protected:
   GsmClientSim7080* sockets[TINY_GSM_MUX_COUNT];
-  String            certificates[TINY_GSM_MUX_COUNT];
+//  String            certificates[TINY_GSM_MUX_COUNT];
 }; // class TinyGsmSim7080
 
 #endif  // SRC_TINYGSMCLIENTSIM7080_H_

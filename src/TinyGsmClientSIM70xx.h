@@ -308,6 +308,7 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
   bool getNetworkSystemMode(bool& n, int16_t& stat) {
     // n: whether to automatically report the system mode info
     // stat: the current service. 0 if it not connected
+    bool success = false;
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
@@ -316,11 +317,12 @@ class TinyGsmSim70xx : public TinyGsmModem<SIM70xxType>,
     n    = thisModem().streamGetIntegerBefore(',') != 0;
     stat = thisModem().streamGetInt16Before('\n');
     thisModem().waitResponse();
+    success = true;
 
 end:
     MS_TINY_GSM_SEM_GIVE_WAIT
     
-    return true;
+    return success;
   }
 
   bool setNetworkSystemMode(bool n) {
