@@ -886,29 +886,48 @@ end:
   } // ::modemConnect(...)
 
   size_t modemSend(const void* buff, size_t len, uint8_t mux) {
-    DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu", mux)
-    DBGCHK(Error, len < UINT16_MAX, "[TinyGsmSim7080] (#%hhu) len(%u) >= UINT16_MAX(%i)!", mux, len, UINT16_MAX)
+    DBGLOG(Debug, "[TinyGsmSim7080] >> mux: %hhu, len: %u", mux, len)
+    // SIM7070/7080/7090 AT+CASEND accepts at most 1460 bytes per command.
+    size_t sent = 0;
+    constexpr size_t maxSendSize = 1460;
+    constexpr uint32_t inputTimeoutMs = 5000L;
+    const uint8_t* data = reinterpret_cast<const uint8_t*>(buff);
+    if (len == 0 || buff == nullptr) { goto end2; }
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
-    size_t _len = len;
+    while (sent < len) {
+      const size_t chunkSize = TinyGsmMin(len - sent, maxSendSize);
+      sendAT(GF("+CASEND="), mux, ',', static_cast<uint16_t>(chunkSize),
+             ',', inputTimeoutMs);
+      if (waitResponse(GF(">")) != 1) { break; }
 
-    // send data on prompt
-    sendAT(GF("+CASEND="), mux, ',', (uint16_t)len);
-    if (waitResponse(GF(">")) != 1) { _len = 0; goto end; }
+      // Complete short UART writes within the already announced chunk.
+      size_t written = 0;
+      while (written < chunkSize) {
+        const size_t n = stream.write(data + sent + written, chunkSize - written);
+        if (n == 0) { break; }
+        written += n;
+      }
+      stream.flush();
 
-    _len = stream.write(reinterpret_cast<const uint8_t*>(buff), len);
-    DBGCHK(Error, _len == len, "stream.write: _len(%u) != len(%u)", _len, len)
-    stream.flush();
+      if (written != chunkSize) {
+        DBGLOG(Error, "[TinyGsmSim7080] (#%hhu) incomplete UART write: %u of %u bytes", mux, written, chunkSize)
+        // Let the modem leave data-input mode before releasing the AT stream.
+        waitResponse(inputTimeoutMs + 1000L);
+        break;
+      }
 
-    // OK after posting data
-    if (waitResponse() != 1) { _len = 0; goto end; }
+      // Count only complete chunks acknowledged by the modem.
+      if (waitResponse() != 1) { break; }
+      sent += chunkSize;
+    }
 
-  end:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
-    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, _len);
-    return _len;
+  end2:
+    DBGLOG(Debug, "[TinyGsmSim7080] (#%hhu) << return: %u", mux, sent);
+    return sent;
   } // ::modemSend(...)
 
   size_t modemRead(size_t size, uint8_t mux) {
