@@ -669,25 +669,28 @@ end:
   // @note        Details see latest "SIM7070_SIM7080_SIM7090 Series_AT Command Manual".
   **/
   String getModemRevisionSoftwareRelease() {
+    String res;
   
     MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CGMR"));
-    String res;
-    if (thisModem().waitResponse(1000L, res) != 1) { return ""; }
+    if (thisModem().waitResponse(1000L, res) != 1) res = ""; 
 
     MS_TINY_GSM_SEM_GIVE_WAIT
     
-    // Do the replaces twice so we cover both \r and \r\n type endings
-    res.replace("\r\nOK\r\n", "");
-    res.replace("\rOK\r", "");
-    res.replace("\r\n", " ");
-    res.replace("\r", " ");
-    // <MS> Additionally:
-    res.replace("OK", "");
-    res.replace("/", "");
-    res.replace("Revision:", "");
-    res.trim();
+    if (res != "") {
+      // Do the replaces twice so we cover both \r and \r\n type endings
+      res.replace("\r\nOK\r\n", "");
+      res.replace("\rOK\r", "");
+      res.replace("\r\n", " ");
+      res.replace("\r", " ");
+      // <MS> Additionally:
+      res.replace("OK", "");
+      res.replace("/", "");
+      res.replace("Revision:", "");
+      res.trim();
+    } // if (res != "")
+
     return res;
   } // TinyGsmSim70xx.getModemRevisionSoftwareRelease
 
