@@ -96,6 +96,9 @@ class TinyGsmModem {
    */
   template <typename... Args>
   inline void sendAT(Args... cmd) {
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
+    // An unknown binary frame must not contaminate later AT transactions.
+    if (!atStreamSynchronized_) { return; }
     thisModem().streamWrite("AT", cmd..., AT_NL);
     thisModem().stream.flush();
     TINY_GSM_YIELD(); /* DBG("### AT:", cmd...); */
@@ -159,6 +162,11 @@ class TinyGsmModem {
                       GsmConstStr r2 = GFP(GSM_ERROR), GsmConstStr r3 = nullptr,
                       GsmConstStr r4 = nullptr, GsmConstStr r5 = nullptr,
                       GsmConstStr r6 = nullptr, GsmConstStr r7 = nullptr) {
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
+    if (!atStreamSynchronized_) {
+      data = "";
+      return 0;
+    }
     return thisModem().waitResponseImpl(timeout_ms, data, r1, r2, r3, r4, r5,
                                         r6, r7);
   }
@@ -219,8 +227,16 @@ class TinyGsmModem {
   }
   // <MS>
   bool waitResponsePlain(unsigned long timeout_ms, std::string& data) {
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
+    if (!atStreamSynchronized_) {
+      data.clear();
+      return false;
+    }
     return thisModem().waitResponsePlainImpl(timeout_ms, data);
   }
+
+  // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
+  bool isATStreamSynchronized() const { return atStreamSynchronized_; }
 
 
   /**
@@ -469,6 +485,10 @@ class TinyGsmModem {
   /**@}*/
   ~TinyGsmModem() {}
 
+  // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
+  // Cleared after failed receive recovery; explicit initialization may retry.
+  bool atStreamSynchronized_ = true;
+
 
   /**
    * @anchor modem_utilities
@@ -491,7 +511,8 @@ class TinyGsmModem {
   inline void streamClear() {
     MS_TINY_GSM_SEM_TAKE_WAIT
 
-    while (thisModem().stream.available()) {
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
+    while (atStreamSynchronized_ && thisModem().stream.available()) {
       thisModem().waitResponse(50, nullptr, nullptr);
     }
 

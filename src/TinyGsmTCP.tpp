@@ -90,6 +90,16 @@ class TinyGsmTCP {
     typedef TinyGsmFifo<uint8_t, TINY_GSM_RX_BUFFER> RxFifo;
 
    public:
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+    // A registered socket has one owner; copies cannot share its registration.
+    GsmClient() = default;
+    GsmClient(const GsmClient&) = delete;
+    GsmClient& operator=(const GsmClient&) = delete;
+
+    bool isAttached() const {
+      return at != nullptr && mux < muxCount && at->sockets[mux] == this;
+    }
+
     // bool init(modemType* modem, uint8_t);
     // int connect(const char* host, uint16_t port, int timeout_s);
 
@@ -126,6 +136,10 @@ class TinyGsmTCP {
 
     // Writes data out on the client using the modem send functionality
     size_t write(const uint8_t* buf, size_t size) override {
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+      if (!isAttached() || !buf || size == 0) { return 0; }
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+      if (sock_stopped) { return 0; }
       TINY_GSM_YIELD();
       at->maintain();
       return at->modemSend(buf, size, mux);
@@ -141,6 +155,10 @@ class TinyGsmTCP {
     }
 
     int available() override {
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+      if (!isAttached()) { return 0; }
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+      if (sock_stopped) { return 0; }
       TINY_GSM_YIELD();
 #if defined TINY_GSM_NO_MODEM_BUFFER
       // Returns the number of characters available in the TinyGSM fifo
@@ -175,6 +193,11 @@ class TinyGsmTCP {
 
     int read(uint8_t* buf, size_t size) override {
       DBGLOG(Verbose, "[TinyGsmTCP] >> size: %u", size)
+
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+      if (!isAttached() || !buf || size == 0) { return 0; }
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+      if (sock_stopped) { return 0; }
 
       TINY_GSM_YIELD();
       size_t cnt = 0;
@@ -272,6 +295,10 @@ class TinyGsmTCP {
     }
 
     int peek() override {
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+      if (!isAttached()) { return -1; }
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+      if (sock_stopped) { return -1; }
       if (!rx.size()) {
         available();
 
@@ -289,10 +316,16 @@ class TinyGsmTCP {
     }
 
     void flush() override {
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+      if (!isAttached()) { return; }
       at->stream.flush();
     }
 
     uint8_t connected() override {
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+      if (!isAttached()) { return false; }
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+      if (sock_stopped) { return false; }
       if (available()) { return true; }
 #if defined TINY_GSM_BUFFER_READ_AND_CHECK_SIZE
       // If the modem is one where we can read and check the size of the buffer,
@@ -329,13 +362,18 @@ class TinyGsmTCP {
     // Doing it this way allows the external mcu to find and get all of the
     // data that it wants from the socket even if it was closed externally.
     inline void dumpModemBuffer(uint32_t maxWaitMs) {
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+      if (!isAttached()) { return; }
 #if defined TINY_GSM_BUFFER_READ_AND_CHECK_SIZE || \
     defined TINY_GSM_BUFFER_READ_NO_CHECK
       TINY_GSM_YIELD();
       uint32_t startMillis = millis();
       while (sock_available > 0 && (millis() - startMillis < maxWaitMs)) {
         rx.clear();
-        at->modemRead(TinyGsmMin((size_t)rx.free(), sock_available), mux);
+        // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+        if (at->modemRead(TinyGsmMin((size_t)rx.free(), sock_available), mux) == 0) {
+          break;
+        }
       }
       rx.clear();
       at->streamClear();
@@ -349,17 +387,23 @@ class TinyGsmTCP {
 #endif
     }
 
-    modemType* at;
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+    // Failed initialization leaves a safe, unregistered client.
+    modemType* at = nullptr;
 
 // <MS>
 public:    
-    uint8_t    mux;
+    uint8_t    mux = 0xFF;
 
 protected:    
-    size_t   sock_available;
-    uint32_t   prev_check;
-    bool       sock_connected;
-    bool       got_data;
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1a
+    size_t     sock_available = 0;
+    uint32_t   prev_check = 0;
+    bool       sock_connected = false;
+    bool       got_data = false;
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+    // A local stop suppresses polling; remote close still permits buffered reads.
+    bool       sock_stopped = true;
     RxFifo     rx;
   }; // class GsmClient
 
