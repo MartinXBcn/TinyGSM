@@ -328,12 +328,11 @@ class TinyGsmTCP {
       if (sock_stopped) { return false; }
       if (available()) { return true; }
 #if defined TINY_GSM_BUFFER_READ_AND_CHECK_SIZE
-      // If the modem is one where we can read and check the size of the buffer,
-      // then the 'available()' function will call a check of the current size
-      // of the buffer and state of the connection. [available calls maintain,
-      // maintain calls modemGetAvailable, modemGetAvailable calls
-      // modemGetConnected]  This cascade means that the sock_connected value
-      // should be correct and all we need
+      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+      // A pending notification still needs a data check, including after remote
+      // close. Keep the client readable until that check resolves the tail.
+      if (got_data) { return true; }
+      // maintain() and URCs refresh the cached state independently of reads.
       return sock_connected;
 #elif defined TINY_GSM_NO_MODEM_BUFFER || defined TINY_GSM_BUFFER_READ_NO_CHECK
       // If the modem doesn't have an internal buffer, or if we can't check how

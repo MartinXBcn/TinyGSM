@@ -315,6 +315,9 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
     initRunning = true;
 
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+    invalidateSocketChecks();
+
     // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
     if (!recoverATStreamImpl()) { goto end; }
 
@@ -416,22 +419,38 @@ endxx:
       return;
     }
 
-    bool check_socks = false;
-    for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; mux++) {
-      GsmClientSim7080* sock = sockets[mux];
-      // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
-      if (sock && !sock->sock_stopped && sock->got_data) {
-        sock->got_data = false;
-        check_socks    = true;
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+    // First consume notifications, then decide which global snapshot is due.
+    while (stream.available()) { waitResponse(15, nullptr, nullptr); }
+
+    bool active = false;
+    for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; ++mux) {
+      if (sockets[mux] && !sockets[mux]->sock_stopped) { active = true; }
+    }
+    if (active) {
+      // Check close notifications/state before unread counts, so final data
+      // remains discoverable even when the peer closed without a data URC.
+      if (!socketStateChecked_ ||
+          millis() - lastSocketStateCheck_ >= socketCheckIntervalMs) {
+        modemGetConnected(0xFF);
+      }
+
+      bool dataPending = false;
+      for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; ++mux) {
+        GsmClientSim7080* sock = sockets[mux];
+        // A positive cached count is a readable lower bound. Refresh unknown
+        // data immediately, while the periodic check discovers additional bytes.
+        if (sock && !sock->sock_stopped && sock->got_data &&
+            sock->sock_available == 0) {
+          dataPending = true;
+        }
+      }
+      if (!socketAvailableChecked_ ||
+          millis() - lastSocketAvailableCheck_ >= socketCheckIntervalMs ||
+          (dataPending && !socketAvailableCheckFailed_)) {
+        modemGetAvailable(0xFF);
       }
     }
-    // modemGetAvailable checks all socks, so we only want to do it once
-    // modemGetAvailable calls modemGetConnected(), which also checks allf
-
-    // Check all mux in use.
-    if (check_socks) { modemGetAvailable((uint8_t)-1); }
-
-    while (stream.available()) { waitResponse(15, nullptr, nullptr); }
 
     MS_TINY_GSM_SEM_GIVE_WAIT
     // xSemaphoreGive(msTinyGsmSemProcess); 
@@ -945,6 +964,9 @@ DBGCOD(
 
     ret = (0 == res);
 
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+    if (ret) { invalidateSocketChecks(); }
+
     DBGCHK(Error, ret, "[TinyGsmSim7080] (mux: %hhu) Result of +CAOPEN: %hhi-%s", mux, res, getCaopenResultText(res))
 
 end:
@@ -1033,7 +1055,11 @@ end:
     if (!discardStreamUntilQuiet(6000L, 3000L)) { return false; }
     atStreamSynchronized_ = true;
     sendAT(GF(""));
-    if (waitResponse() == 1) { return true; }
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+    if (waitResponse() == 1) {
+      invalidateSocketChecks();
+      return true;
+    }
     atStreamSynchronized_ = false;
     return false;
   }
@@ -1058,6 +1084,10 @@ end:
           TinyGsmMin(size, static_cast<size_t>(sock->rx.free())), maxReadSize);
 
       if (requested > 0) {
+        // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+        // Save the count before any URC can replace it with a newer absolute
+        // count. Subtracting from that newer value could count the read twice.
+        const size_t availableBefore = sock->sock_available;
         sendAT(GF("+CARECV="), mux, ',', static_cast<uint16_t>(requested));
         bool complete = waitResponse(GF("+CARECV:")) == 1;
         size_t confirmed = 0;
@@ -1139,7 +1169,14 @@ end:
           }
         }
         if (complete) {
-          sock->sock_available = modemGetAvailable(mux);
+          // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+          // New arrivals cannot invalidate the saved lower bound. Preserve
+          // got_data so additional bytes are checked when this bound runs out.
+          if (confirmed < requested || buffered >= availableBefore) {
+            sock->sock_available = 0;
+          } else {
+            sock->sock_available = availableBefore - buffered;
+          }
         } else {
           DBGLOG(Error, "[TinyGsmSim7080] (#%hhu) Invalid or incomplete CARECV response; close socket.", mux)
           sock->resetSocketState();
@@ -1175,176 +1212,189 @@ end:
     return buffered;
   } // ::modemRead(...)
 
-  size_t modemGetAvailable(uint8_t mux) {
-    // If the socket doesn't exist, just return
-    size_t result_sum = 0;
-    DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) >>", mux);
-    DBGCHK(Warn, MS_TINY_GSM_SEM_BLOCKED, "[TinyGsmSim7080] Not blocked by calling function")
-    DBGCHK(Error, (mux == (uint8_t)-1) || (sockets[mux] != nullptr), "[TinyGsmSim7080] (mux: %hhu) socket (mux) does not exist!", mux)
-    if (!((mux == (uint8_t)-1) || (sockets[mux] != nullptr))) { goto end; }
-
-    // NOTE: This gets how many characters are available on all connections that
-    // have data.  It does not return all the connections, just those with data.
-    sendAT(GF("+CARECV?"));
-    for (uint8_t muxNo = 0; muxNo < TINY_GSM_MUX_COUNT; muxNo++) {
-      // after the last connection, there's an ok, so we catch it right away
-      int res = waitResponse(3000, GF("+CARECV:"), GFP(GSM_OK), GFP(GSM_ERROR));
-      // if we get the +CARECV: response, read the mux number and the number of
-      // characters available
-      if (res == 1) {
-        uint8_t ret_mux = streamGetUInt8Before(',');
-        size_t result  = streamGetSizeBefore('\n');
-
-        if (ret_mux >= TINY_GSM_MUX_COUNT) {
-          DBGLOG(Error, "[TinyGsmSim7080] (mux: %hhu) ret_mux out of range: %hhu (range: 0..%i), result: %u", 
-            mux, ret_mux, TINY_GSM_MUX_COUNT - 1, result);
-          continue;
-        }
-
-        result_sum += result;
-
-        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %hhu, res=1: ret_mux: %hhu, available: %u", mux, muxNo, ret_mux, result);
-
-        GsmClientSim7080* sock    = sockets[ret_mux];
-        // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
-        if (sock) { sock->sock_available = sock->sock_stopped ? 0 : result; }
-        // if the first returned mux isn't 0 (or is higher than expected)
-        // we need to fill in the missing muxes
-        if (ret_mux > muxNo) {
-          for (uint8_t extra_mux = muxNo; extra_mux < ret_mux; extra_mux++) {
-            GsmClientSim7080* isock = sockets[extra_mux];
-            if (isock) { isock->sock_available = 0; }
-          }
-          muxNo = ret_mux;
-        }
-      } else if (res == 2) {
-        // if we get an OK, we've reached the last socket with available data
-        // so we set any we haven't gotten to yet to 0
-
-        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %hhu, res=2.", mux, muxNo);
-
-        for (uint8_t extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT; extra_mux++) {
-          GsmClientSim7080* isock = sockets[extra_mux];
-          if (isock) { isock->sock_available = 0; }
-        }
-        break;
-      } else {
-        // if we got an error, give up
-        DBGLOG(Warn, "[TinyGsmSim7080] (mux: %hhu) ERROR.", mux);
+  // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+  // Parse one complete query row within the transaction deadline. Even an
+  // invalid row is consumed through LF so its remainder cannot become a reply.
+  bool readSocketStatusRow(uint8_t& mux, size_t& value,
+                           uint32_t started, uint32_t timeoutMs) {
+    size_t fields[2] = {0, 0};
+    unsigned field = 0;
+    bool digits = false;
+    bool trailingSpace = false;
+    bool valid = true;
+    bool lineComplete = false;
+    const size_t maxValue = static_cast<size_t>(-1);
+    // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+    uint32_t lastIdleYield = millis();
+    while (millis() - started < timeoutMs) {
+      if (millis() - lastIdleYield >= 100L) {
+        delay(10);
+        lastIdleYield = millis();
+      }
+      const int c = stream.read();
+      if (c < 0) {
+        delay(10);
+        continue;
+      }
+      if (c == '\n') {
+        lineComplete = true;
         break;
       }
-      // Should be a final OK at the end.
-      // If every connection was returned, catch the OK here.
-      // If only a portion were returned, catch it above.
-      if (muxNo == TINY_GSM_MUX_COUNT - 1) { waitResponse(); }
-    } // for muxNo
-
-    modemGetConnected(mux);  // check the state of all connections
-    if (mux == (uint8_t)-1) {
-      // No specific mux given, all active muxs updated, no specific return-value expected by caller.
-      // If there was at least one mux with available return > 0.
-      goto end;
+      if (!valid) { continue; }
+      if (c == ',' && field == 0 && digits) {
+        field = 1;
+        digits = false;
+        trailingSpace = false;
+      } else if (c == ' ' || c == '\t' || c == '\r') {
+        if (digits) { trailingSpace = true; }
+      } else if (c >= '0' && c <= '9' && !trailingSpace) {
+        const unsigned digit = static_cast<unsigned>(c - '0');
+        if (fields[field] > (maxValue - digit) / 10) {
+          valid = false;
+        } else {
+          fields[field] = fields[field] * 10 + digit;
+          digits = true;
+        }
+      } else {
+        valid = false;
+      }
     }
-    if (!sockets[mux]) { 
-      result_sum = 0; 
-      goto end;
+    if (!lineComplete || !valid || field != 1 || !digits ||
+        fields[0] >= TINY_GSM_MUX_COUNT) {
+      return false;
     }
-    result_sum = sockets[mux]->sock_available;
+    mux = static_cast<uint8_t>(fields[0]);
+    value = fields[1];
+    return true;
+  }
 
-end:
-    DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) << return: %u", mux, result_sum);
-    return result_sum;
+  // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+  size_t modemGetAvailable(uint8_t mux) {
+    // Caller owns the TinyGSM semaphore; one CARECV? describes all sockets.
+    if (!isATStreamSynchronized() ||
+        (mux != 0xFF && (mux >= TINY_GSM_MUX_COUNT || !sockets[mux]))) {
+      return 0;
+    }
+
+    size_t snapshot[TINY_GSM_MUX_COUNT] = {};
+    for (uint8_t i = 0; i < TINY_GSM_MUX_COUNT; ++i) {
+      GsmClientSim7080* sock = sockets[i];
+      if (sock && !sock->sock_stopped) { sock->got_data = false; }
+    }
+
+    constexpr uint32_t timeoutMs = 3000L;
+    const uint32_t started = millis();
+    bool valid = true;
+    bool success = false;
+    sendAT(GF("+CARECV?"));
+    while (true) {
+      const uint32_t elapsed = millis() - started;
+      if (elapsed >= timeoutMs) { break; }
+      const uint32_t remaining = timeoutMs - elapsed;
+      const int res = waitResponse(remaining, GF("+CARECV:"), GFP(GSM_OK),
+                                   GFP(GSM_ERROR));
+      if (res == 2) {
+        success = valid;
+        break;
+      }
+      if (res != 1) { break; }
+
+      uint8_t rowMux = 0;
+      size_t count = 0;
+      if (readSocketStatusRow(rowMux, count, started, timeoutMs)) {
+        // Repeated or unsorted rows are valid; the latest value wins.
+        snapshot[rowMux] = count;
+      } else {
+        valid = false;
+      }
+    }
+
+    const uint32_t checkedAt = millis();
+    lastSocketAvailableCheck_ = checkedAt;
+    socketAvailableChecked_ = true;
+    socketAvailableCheckFailed_ = !success;
+    size_t result = 0;
+    for (uint8_t i = 0; i < TINY_GSM_MUX_COUNT; ++i) {
+      GsmClientSim7080* sock = sockets[i];
+      if (!sock || sock->sock_stopped) { continue; }
+      sock->prev_check = checkedAt;
+      if (!success) {
+        sock->got_data = true;
+      } else if (!sock->got_data) {
+        // A URC received during the query must survive an older snapshot.
+        sock->sock_available = snapshot[i];
+      } else if (snapshot[i] > sock->sock_available) {
+        // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+        // No read can run during this query. A positive snapshot remains a
+        // useful lower bound even if more data was announced before final OK.
+        // Keeping it prevents continuous URCs from starving the receive path.
+        sock->sock_available = snapshot[i];
+      }
+      if (mux == 0xFF) {
+        result += sock->sock_available;
+      } else if (mux == i) {
+        result = sock->sock_available;
+      }
+    }
+    return result;
   } // ::modemGetAvailable(...)
 
 
+  // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
   bool modemGetConnected(uint8_t mux) {
-    // NOTE:  This gets the state of all connections that have been opened
-    // since the last connection
-    DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) >>", mux)
-    DBGCHK(Warn, MS_TINY_GSM_SEM_BLOCKED, "[TinyGsmSim7080] (mux: %hhu) Not blocked by calling function", mux)
+    // Connection-state polling has its own schedule and never queries data.
+    if (!isATStreamSynchronized() ||
+        (mux != 0xFF && (mux >= TINY_GSM_MUX_COUNT || !sockets[mux]))) {
+      return false;
+    }
 
+    bool snapshot[TINY_GSM_MUX_COUNT] = {};
+    constexpr uint32_t timeoutMs = 3000L;
+    const uint32_t started = millis();
+    bool valid = true;
+    bool success = false;
     sendAT(GF("+CASTATE?"));
-
-// <MS>
-    bool connected_sum = false;
-// <MS>        
-
-    for (uint8_t muxNo = 0; muxNo < TINY_GSM_MUX_COUNT; muxNo++) {
-      // after the last connection, there's an ok, so we catch it right away
-      int8_t res = waitResponse(3000, GF("+CASTATE:"), GFP(GSM_OK), GFP(GSM_ERROR));
-      // if we get the +CASTATE: response, read the mux number and the status
-      if (res == 1) {
-        uint8_t ret_mux = streamGetUInt8Before(',');
-        size_t status  = streamGetSizeBefore('\n');
-
-        if (ret_mux >= TINY_GSM_MUX_COUNT) {
-          DBGLOG(Error, "[TinyGsmSim7080] (mux: %hhu) ret_mux out of range: %hhu (range: 0..%i), status: %u", 
-            mux, ret_mux, TINY_GSM_MUX_COUNT - 1, status);
-          continue;
-        }
-
-        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) muxNo: %hhu, res=ok: ret_mux: %hhu, status: %u-%s", 
-          mux, muxNo, ret_mux, status,
-          (status == 0) ? "Closed by remote server or internal error" :
-          (status == 1) ? "Connected to remote server" :
-          (status == 2) ? "Listening (server mode)" : "Unknown status"
-          )
-
-        // 0: Closed by remote server or internal error
-        // 1: Connected to remote server
-        // 2: Listening (server mode)
-        GsmClientSim7080* sock = sockets[ret_mux];
-        if (sock) { 
-          // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
-          sock->sock_connected = !sock->sock_stopped && (status == 1);
-// <MS>
-          connected_sum = connected_sum || sock->sock_connected;
-// <MS>          
-        }
-        // if the first returned mux isn't 0 (or is higher than expected)
-        // we need to fill in the missing muxes
-        if (ret_mux > muxNo) {
-          for (int extra_mux = muxNo; extra_mux < ret_mux; extra_mux++) {
-            GsmClientSim7080* isock = sockets[extra_mux];
-            if (isock) { isock->sock_connected = false; }
-          }
-          muxNo = ret_mux;
-        }
-      } else if (res == 2) {
-        // if we get an OK, we've reached the last socket with available data
-        // so we set any we haven't gotten to yet to 0
-
-        DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) : muxNo: %hhu, res=error.", mux, muxNo)
-
-        for (uint8_t extra_mux = muxNo; extra_mux < TINY_GSM_MUX_COUNT; extra_mux++) {
-          GsmClientSim7080* isock = sockets[extra_mux];
-          if (isock) { isock->sock_connected = false; }
-        }
-        break;
-      } else {
-        // if we got an error, give up
-        DBGLOG(Warn, "[TinyGsmSim7080] (mux: %hhu) waitResponse() returned error: %hhi", mux, res)
+    while (true) {
+      const uint32_t elapsed = millis() - started;
+      if (elapsed >= timeoutMs) { break; }
+      const uint32_t remaining = timeoutMs - elapsed;
+      const int res = waitResponse(remaining, GF("+CASTATE:"), GFP(GSM_OK),
+                                   GFP(GSM_ERROR));
+      if (res == 2) {
+        success = valid;
         break;
       }
-      // Should be a final OK at the end.
-      // If every connection was returned, catch the OK here.
-      // If only a portion were returned, catch it above.
-      if (muxNo == TINY_GSM_MUX_COUNT - 1) { waitResponse(); }
+      if (res != 1) { break; }
+
+      uint8_t rowMux = 0;
+      size_t status = 0;
+      if (readSocketStatusRow(rowMux, status, started, timeoutMs) && status <= 2) {
+        snapshot[rowMux] = status == 1;
+      } else {
+        valid = false;
+      }
     }
 
-    if (mux == (uint8_t)-1) {
-      // No specific mux given, all active muxs updated, no specific return-value expected by caller.
-      goto end;
+    lastSocketStateCheck_ = millis();
+    socketStateChecked_ = true;
+    bool result = false;
+    for (uint8_t i = 0; i < TINY_GSM_MUX_COUNT; ++i) {
+      GsmClientSim7080* sock = sockets[i];
+      if (!sock || sock->sock_stopped) { continue; }
+      if (success) {
+        if (sock->sock_connected && !snapshot[i]) {
+          // Remote close can leave unread tail data in the modem.
+          sock->got_data = true;
+        }
+        sock->sock_connected = snapshot[i];
+      }
+      if (mux == 0xFF) {
+        result = result || sock->sock_connected;
+      } else if (mux == i) {
+        result = sock->sock_connected;
+      }
     }
-    if (!sockets[mux]) { 
-      connected_sum = false; 
-      goto end;
-    }
-    connected_sum = sockets[mux]->sock_connected;
-
-end:
-    DBGLOG(Debug, "[TinyGsmSim7080] (mux: %hhu) << return: %s", mux, DBGB2S(connected_sum))
-    return connected_sum;
+    return result;
   } // ::modemGetConnected(...)
 
   /*
@@ -1380,6 +1430,9 @@ end:
       if (mux < TINY_GSM_MUX_COUNT && sockets[mux] && !sockets[mux]->sock_stopped) {
         if (state != 1) {
           sockets[mux]->sock_connected = false;
+          // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+          // Discover final unread bytes even if their data notification was lost.
+          sockets[mux]->got_data = true;
           DBGLOG(Info, "{TinyGsmSim7080} Closed mux: %hhu", mux)
         }
       }
@@ -1452,6 +1505,21 @@ end:
   } // ::handleURCs(...)
 
  protected:
+  // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+  // CARECV? and CASTATE? each describe every socket, so polling is modem-wide.
+  static constexpr uint32_t socketCheckIntervalMs = 500L;
+  uint32_t lastSocketAvailableCheck_ = 0;
+  uint32_t lastSocketStateCheck_ = 0;
+  bool socketAvailableChecked_ = false;
+  bool socketStateChecked_ = false;
+  bool socketAvailableCheckFailed_ = false;
+
+  void invalidateSocketChecks() {
+    socketAvailableChecked_ = false;
+    socketStateChecked_ = false;
+    socketAvailableCheckFailed_ = false;
+  }
+
   GsmClientSim7080* sockets[TINY_GSM_MUX_COUNT];
 //  String            certificates[TINY_GSM_MUX_COUNT];
 }; // class TinyGsmSim7080
