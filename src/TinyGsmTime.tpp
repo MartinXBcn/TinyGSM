@@ -194,7 +194,7 @@ class TinyGsmTime {
       iday, imonth, iyear, ihour, imin, isec, static_cast<float>(itimezone) / 4.0)
 
 end:    
-    DBGLOG(Info, "[TinyGsmTime] >> return: %s", DBGB2S(ret))
+    DBGLOG(Info, "[TinyGsmTime] << return: %s", DBGB2S(ret))
     return ret;
   }
 

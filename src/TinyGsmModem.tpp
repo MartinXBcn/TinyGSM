@@ -752,6 +752,8 @@ class TinyGsmModem {
     uint32_t startMillis = millis();
     ms_delay_timer = millis() + MS_WAITRESPONSE_DELAY_TIMER_INTERVAL;
     do {
+      // 16.11.2026 - A reset URC may quarantine an already active transaction.
+      if (!atStreamSynchronized_) { goto finish; }
       if (millis() > ms_delay_timer) {
         delay(10);
         ms_delay_timer = millis() + MS_WAITRESPONSE_DELAY_TIMER_INTERVAL;
@@ -804,6 +806,9 @@ class TinyGsmModem {
 #endif
         else if (thisModem().handleURCs(data)) {
           data = "";
+          // Do not accept an old command's trailing OK after a modem reset or
+          // wait out a long CAOPEN timeout while the owner needs recovery.
+          if (!atStreamSynchronized_) { goto finish; }
         }
       } // while
     } while (millis() - startMillis < timeout_ms);

@@ -15,6 +15,7 @@
 
 // For char-to-hex-conversion.
 #include "ms_General.h"
+#include <atomic>
 
 
 #define TINY_GSM_MUX_COUNT 12
@@ -36,6 +37,13 @@
 #define MS_LOGGER_LEVEL MS_TINYGSM_LOGGING
 #endif
 #include "ESP32Logger.h"
+
+// 15.11.2026 - Optional OTA diagnostics compile out all measurement work.
+#if defined(MS_OTA_DIAGNOSTICS)
+#define TINY_GSM_OTA_DIAG(...) __VA_ARGS__
+#else
+#define TINY_GSM_OTA_DIAG(...)
+#endif
 
 
 
@@ -81,7 +89,11 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       // A failed attachment must never unregister another client's socket.
       if (isAttached()) {
         MS_TINY_GSM_SEM_TAKE_WAIT
-        if (isAttached()) { at->sockets[mux] = nullptr; }
+        if (isAttached()) {
+          // 15.11.2026 - A replacement client starts with default data polling.
+          at->socketAvailableCheckIntervals_[mux] = 0;
+          at->sockets[mux] = nullptr;
+        }
         MS_TINY_GSM_SEM_GIVE_WAIT
       }
       DBGLOG(Info, "%s<<", TAG)
@@ -101,7 +113,11 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
       MS_TINY_GSM_SEM_TAKE_WAIT
 
-      if (isAttached()) { at->sockets[mux] = nullptr; }
+      if (isAttached()) {
+        // 15.11.2026 - Do not carry an OTA poll override to another attachment.
+        at->socketAvailableCheckIntervals_[mux] = 0;
+        at->sockets[mux] = nullptr;
+      }
       at = nullptr;
       mux = 0xFF;
       resetSocketState();
@@ -111,6 +127,7 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       if (r) {
         at = _modem;
         mux = _mux;
+        at->socketAvailableCheckIntervals_[mux] = 0;
         at->sockets[mux] = this;
       } else {
         DBGLOG(Warn, "%sInvalid or occupied mux: %hhu", TAG, _mux)
@@ -160,13 +177,25 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
       // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
       // Clear local state even if draining timed out or modem close fails.
       resetSocketState();
+      // 15.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+      // Keep the initial cleanup for sockets left by an earlier client/boot.
+      // Only our own open attempt makes a missing close acknowledgement an
+      // error; an unused or confirmed-closed socket may reject CACLOSE.
+      const bool closeExpected = at->socketClosePending_[mux];
       at->sendAT(GF("+CACLOSE="), mux);
-      if (at->waitResponse(3000) != 1) {
+      bool closeConfirmed = at->waitResponse(3000) == 1;
+      if (!closeConfirmed && closeExpected) {
         DBGLOG(Warn, "%sClose not confirmed for mux %hhu; retrying", TAG, mux)
         at->sendAT(GF("+CACLOSE="), mux);
-        if (at->waitResponse(3000) != 1) {
+        closeConfirmed = at->waitResponse(3000) == 1;
+        if (!closeConfirmed) {
           DBGLOG(Error, "%sCould not confirm close for mux %hhu", TAG, mux)
         }
+      }
+      if (closeConfirmed) {
+        at->socketClosePending_[mux] = false;
+      } else if (!closeExpected) {
+        DBGLOG(Debug, "%sIdle socket cleanup not confirmed for mux %hhu; no pending open attempt", TAG, mux)
       }
       resetSocketState();
 
@@ -243,6 +272,173 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
 
  // <MS>
  public:
+  // 15.11.2026 - Accelerate data polling for one client, independently of
+  // diagnostics. The override survives stop/reconnect within its OTA session.
+  // Valid intervals are 1..500 ms; zero/default is restored explicitly or when
+  // the client is detached. Callers keep ownership of the client/mux stable.
+  bool setSocketAvailableCheckInterval(uint8_t mux, uint32_t intervalMs) {
+    bool configured = false;
+    MS_TINY_GSM_SEM_TAKE_WAIT
+    if (mux < TINY_GSM_MUX_COUNT && intervalMs > 0 &&
+        intervalMs <= socketAvailableCheckDefaultIntervalMs && sockets[mux] &&
+        sockets[mux]->isAttached()) {
+      socketAvailableCheckIntervals_[mux] = intervalMs;
+      configured = true;
+    }
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    return configured;
+  }
+
+  void resetSocketAvailableCheckInterval(uint8_t mux) {
+    MS_TINY_GSM_SEM_TAKE_WAIT
+    if (mux < TINY_GSM_MUX_COUNT) { socketAvailableCheckIntervals_[mux] = 0; }
+    MS_TINY_GSM_SEM_GIVE_WAIT
+  }
+
+#if defined(MS_OTA_DIAGNOSTICS)
+  // 15.11.2026 - Optional OTA diagnostics.
+  // One modem-wide measurement window, with reads and URCs scoped to mux.
+  // Snapshot bytes are repeated queue observations, not transferred bytes.
+  struct ReceiveDiagnostics {
+    bool active = false;
+    uint8_t mux = 0xFF;
+    uint32_t elapsedMs = 0;
+    uint32_t pollIntervalMs = 0;
+    uint32_t availableQueries = 0;
+    uint32_t availableQueryErrors = 0;
+    uint32_t nonzeroSnapshots = 0;
+    uint32_t queryGapCount = 0;
+    uint32_t queryGapMinMs = 0;
+    uint32_t queryGapMaxMs = 0;
+    uint32_t queryGaps400to650 = 0;
+    uint32_t periodicQueries = 0;
+    uint32_t notificationQueries = 0;
+    uint32_t initialQueries = 0;
+    uint32_t stateQueries = 0;
+    uint32_t dataUrcs = 0;
+    uint32_t recvUrcs = 0;
+    uint32_t reads = 0;
+    uint32_t zeroReads = 0;
+    uint32_t shortReads = 0;
+    uint32_t failedReads = 0;
+    uint32_t reads1023 = 0;
+    uint32_t reads437 = 0;
+    uint64_t queryGapSumMs = 0;
+    uint64_t availableQueryUs = 0;
+    uint64_t snapshotBytes = 0;
+    uint64_t stateQueryUs = 0;
+    uint64_t readUs = 0;
+    uint64_t readBytes = 0;
+    uint64_t readWaitUs = 0;
+  };
+
+  // 16.11.2026 - Cached receive state for a TLS failure observer. Snapshot
+  // counts describe the last successful query, not a new modem transaction.
+  struct ReceiveDiagnosticsState {
+    bool valid = false;
+    bool lockBusy = false;
+    bool active = false;
+    bool atSynchronized = false;
+    bool socketConnected = false;
+    bool socketStopped = false;
+    uint8_t mux = 0xFF;
+    size_t fifoBytes = 0;
+    size_t cachedAvailable = 0;
+    size_t lastSnapshotBytes = 0;
+    bool querySeen = false;
+    bool lastQuerySucceeded = false;
+    bool snapshotSeen = false;
+    bool readSeen = false;
+    uint32_t queryAgeMs = 0;
+    uint32_t snapshotAgeMs = 0;
+    uint32_t lastReadAgeMs = 0;
+    uint32_t emptySnapshotRunCount = 0;
+    uint32_t emptySnapshotRunMs = 0;
+    uint32_t maxReadGapMs = 0;
+    uint64_t readBytes = 0;
+  };
+
+  ReceiveDiagnosticsState getReceiveDiagnosticsState(uint8_t mux) {
+    ReceiveDiagnosticsState result;
+    result.mux = mux;
+    // 16.11.2026 - Diagnostics must neither issue AT traffic nor wait behind
+    // a busy modem transaction. An unavailable snapshot stays explicitly invalid.
+    if (!msTinyGsmSemProcess) { return result; }
+    if (xSemaphoreTake(msTinyGsmSemProcess, 0) != pdTRUE) {
+      result.lockBusy = true;
+      return result;
+    }
+    result.active = receiveDiagnostics_.active && receiveDiagnostics_.mux == mux;
+    if (result.active && mux < TINY_GSM_MUX_COUNT && sockets[mux] &&
+        sockets[mux]->isAttached()) {
+      result = receiveDiagnosticsState_;
+      result.valid = true;
+      result.active = true;
+      result.mux = mux;
+      result.atSynchronized = atStreamSynchronized_;
+      result.socketConnected = sockets[mux]->sock_connected;
+      result.socketStopped = sockets[mux]->sock_stopped;
+      result.fifoBytes = sockets[mux]->rx.size();
+      result.cachedAvailable = sockets[mux]->sock_available;
+      result.readBytes = receiveDiagnostics_.readBytes;
+      const uint32_t now = millis();
+      if (result.querySeen) { result.queryAgeMs = now - receiveDiagnosticsLastStateQueryMs_; }
+      if (result.snapshotSeen) { result.snapshotAgeMs = now - receiveDiagnosticsLastSnapshotMs_; }
+      if (result.readSeen) {
+        result.lastReadAgeMs = now - receiveDiagnosticsLastReadMs_;
+        // 16.11.2026 - Include a currently open gap, not only completed gaps.
+        if (result.lastReadAgeMs > result.maxReadGapMs) {
+          result.maxReadGapMs = result.lastReadAgeMs;
+        }
+      }
+      if (result.emptySnapshotRunCount > 0) {
+        result.emptySnapshotRunMs = now - receiveDiagnosticsEmptyRunStartedMs_;
+      }
+    }
+    xSemaphoreGive(msTinyGsmSemProcess);
+    return result;
+  }
+
+  bool beginReceiveDiagnostics(uint8_t mux) {
+    bool started = false;
+    MS_TINY_GSM_SEM_TAKE_WAIT
+    if (mux < TINY_GSM_MUX_COUNT && sockets[mux] &&
+        sockets[mux]->isAttached()) {
+      receiveDiagnostics_ = ReceiveDiagnostics{};
+      receiveDiagnostics_.active = true;
+      receiveDiagnostics_.mux = mux;
+      // Report the selected interval even before the first connection opens.
+      receiveDiagnostics_.pollIntervalMs = socketAvailableCheckIntervals_[mux] ?
+          socketAvailableCheckIntervals_[mux] : socketAvailableCheckDefaultIntervalMs;
+      // 16.11.2026 - Reset presence flags as well as timestamps; uptime zero
+      // and millis() wrap are valid observations within a measurement window.
+      receiveDiagnosticsState_ = ReceiveDiagnosticsState{};
+      receiveDiagnosticsLastStateQueryMs_ = 0;
+      receiveDiagnosticsLastSnapshotMs_ = 0;
+      receiveDiagnosticsLastReadMs_ = 0;
+      receiveDiagnosticsEmptyRunStartedMs_ = 0;
+      receiveDiagnosticsStartedMs_ = millis();
+      receiveDiagnosticsLastQueryMs_ = 0;
+      started = true;
+    }
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    return started;
+  }
+
+  // The returned active flag identifies a window that was running. Repeated
+  // calls return active=false, preventing duplicate summaries of that window.
+  ReceiveDiagnostics endReceiveDiagnostics() {
+    MS_TINY_GSM_SEM_TAKE_WAIT
+    if (receiveDiagnostics_.active) {
+      receiveDiagnostics_.elapsedMs = millis() - receiveDiagnosticsStartedMs_;
+    }
+    const ReceiveDiagnostics result = receiveDiagnostics_;
+    receiveDiagnostics_.active = false;
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    return result;
+  }
+#endif
+
   // Set by handleURCs(...) when receiving "DST" from the network.
   // -1: not set, 0: standard time, 1: daylight saving time
   // Sometimes not set by the network, therefore stored in preferences by MsGsm as default for next time re-start.
@@ -293,6 +489,56 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     return recovered;
   }
 
+  // 15.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+  // Block ordinary AT traffic while the host reconfigures its UART. Recovery
+  // must verify the resulting connection before transactions are allowed again.
+  void invalidateATStream() {
+    MS_TINY_GSM_SEM_TAKE_WAIT
+    atStreamSynchronized_ = false;
+    for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; ++mux) {
+      if (sockets[mux]) { sockets[mux]->resetSocketState(); }
+    }
+    invalidateSocketChecks();
+    MS_TINY_GSM_SEM_GIVE_WAIT
+  }
+
+  // 16.11.2026 - Defer unexpected modem-reset recovery to the GSM owner task.
+  // This query must not wait for the AT semaphore held by an active command.
+  bool isModemRecoveryRequired() const {
+    return modemRecoveryRequired_.load(std::memory_order_acquire);
+  }
+
+  // The GSM owner calls these around one complete UART/setup/power-cycle attempt.
+  // begin is idempotent; expected boot notifications do not request recovery.
+  void beginModemRecovery() {
+    MS_TINY_GSM_SEM_TAKE_WAIT
+    if (!expectedModemBoot_) {
+      modemBootNotificationSeen_ = false;
+      modemRecoveryRequired_.store(false, std::memory_order_release);
+    }
+    expectedModemBoot_ = true;
+    modemBootGraceActive_ = false;
+    atStreamSynchronized_ = false;
+    resetModemSocketState(false);
+    MS_TINY_GSM_SEM_GIVE_WAIT
+  }
+
+  void endModemRecovery(bool success) {
+    MS_TINY_GSM_SEM_TAKE_WAIT
+    expectedModemBoot_ = false;
+    success = success && atStreamSynchronized_ && !isModemRecoveryRequired();
+    modemRecoveryRequired_.store(!success, std::memory_order_release);
+    // SMS Ready can arrive just after setup; accept one late notification only
+    // if the boot announcement was not already consumed during this attempt.
+    modemBootGraceActive_ = success && !modemBootNotificationSeen_;
+    modemBootGraceStartedMs_ = millis();
+    if (!success) {
+      atStreamSynchronized_ = false;
+      resetModemSocketState(false);
+    }
+    MS_TINY_GSM_SEM_GIVE_WAIT
+  }
+
   /*
    * Basic functions
    */
@@ -314,6 +560,10 @@ class TinyGsmSim7080 : public TinyGsmSim70xx<TinyGsmSim7080>,
     MS_TINY_GSM_SEM_TAKE_WAIT
 
     initRunning = true;
+    // 16.11.2026 - A standalone init also accepts one expected boot notice.
+    if (!expectedModemBoot_ && !restartRunning_) {
+      modemBootNotificationSeen_ = false;
+    }
 
     // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
     invalidateSocketChecks();
@@ -421,7 +671,11 @@ endxx:
 
     // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
     // First consume notifications, then decide which global snapshot is due.
-    while (stream.available()) { waitResponse(15, nullptr, nullptr); }
+    // 16.11.2026 - A reset URC quarantines the stream during this drain.
+    // Leave unread boot bytes for explicit recovery instead of spinning here.
+    while (atStreamSynchronized_ && stream.available()) {
+      waitResponse(15, nullptr, nullptr);
+    }
 
     bool active = false;
     for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; ++mux) {
@@ -431,7 +685,7 @@ endxx:
       // Check close notifications/state before unread counts, so final data
       // remains discoverable even when the peer closed without a data URC.
       if (!socketStateChecked_ ||
-          millis() - lastSocketStateCheck_ >= socketCheckIntervalMs) {
+          millis() - lastSocketStateCheck_ >= socketStateCheckIntervalMs) {
         modemGetConnected(0xFF);
       }
 
@@ -446,7 +700,7 @@ endxx:
         }
       }
       if (!socketAvailableChecked_ ||
-          millis() - lastSocketAvailableCheck_ >= socketCheckIntervalMs ||
+          millis() - lastSocketAvailableCheck_ >= socketAvailableCheckInterval() ||
           (dataPending && !socketAvailableCheckFailed_)) {
         modemGetAvailable(0xFF);
       }
@@ -472,6 +726,9 @@ endxx:
     String s;
 
     bool gotATOK = false;
+    // 16.11.2026 - CREBOOT produces an expected SMS Ready notification.
+    restartRunning_ = true;
+    if (!expectedModemBoot_) { modemBootNotificationSeen_ = false; }
     // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
     if (!recoverATStreamImpl()) { success = false; goto end; }
     for (uint32_t start = millis(); millis() - start < 10000L;) {
@@ -524,6 +781,7 @@ endxx:
     MS_TINY_GSM_SEM_GIVE_WAIT
 
   endx:
+    restartRunning_ = false;
     DBGLOG(Info, "[TinyGsmSim7080] << return: %s", DBGB2S(success));
     return success;
   } // TinyGsmSim7080::restartImpl(...)
@@ -937,6 +1195,9 @@ DBGCOD(
     //                +CAURC:
     //                "recv",<id>,<length>,<remoteIP>,<remote_port><CR><LF><data>
     // NOTE:  including the <recv_mode> fails
+    // 15.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+    // Even an unsuccessful/timed-out open can leave modem resources allocated.
+    if (mux < TINY_GSM_MUX_COUNT) { socketClosePending_[mux] = true; }
     sendAT(GF("+CAOPEN="), mux, GF(",0,\"TCP\",\""), host, GF("\","), port);
     if (waitResponse(timeout_ms, GF(AT_NL "+CAOPEN:")) != 1) { goto end; }
     // returns OK/r/n/r/n+CAOPEN: <cid>,<result>
@@ -1051,6 +1312,8 @@ end:
   // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
   // Called with the AT semaphore held, only by explicit setup/init/restart.
   bool recoverATStreamImpl() {
+    // 16.11.2026 - Only the owner may start recovery after a modem reset.
+    if (isModemRecoveryRequired()) { return false; }
     if (atStreamSynchronized_) { return true; }
     if (!discardStreamUntilQuiet(6000L, 3000L)) { return false; }
     atStreamSynchronized_ = true;
@@ -1084,6 +1347,22 @@ end:
           TinyGsmMin(size, static_cast<size_t>(sock->rx.free())), maxReadSize);
 
       if (requested > 0) {
+        // 15.11.2026 - Optional OTA diagnostics.
+        TINY_GSM_OTA_DIAG(
+        const bool diagnose = receiveDiagnostics_.active &&
+                              receiveDiagnostics_.mux == mux;
+        const uint32_t diagnosticStartedUs = diagnose ? micros() : 0;
+        if (diagnose) { ++receiveDiagnostics_.reads; }
+        )
+        // Only existing waits for missing UART bytes need extra timestamps.
+        const auto waitForInput = [&]() {
+          TINY_GSM_OTA_DIAG(const uint32_t waitStartedUs = diagnose ? micros() : 0;)
+          delay(10);
+          TINY_GSM_OTA_DIAG(if (diagnose) {
+            receiveDiagnostics_.readWaitUs +=
+                static_cast<uint32_t>(micros() - waitStartedUs);
+          })
+        };
         // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
         // Save the count before any URC can replace it with a newer absolute
         // count. Subtracting from that newer value could count the read twice.
@@ -1101,7 +1380,8 @@ end:
           const int c = stream.read();
           if (c < 0) {
             // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
-            delay(10);
+            // 15.11.2026 - Measure UART waits only with OTA diagnostics enabled.
+            waitForInput();
             continue;
           }
           if (digits == 0 && (c == ' ' || c == '\t')) { continue; }
@@ -1136,7 +1416,8 @@ end:
               break;
             }
             // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
-            delay(10);
+            // 15.11.2026 - Measure UART waits only with OTA diagnostics enabled.
+            waitForInput();
             continue;
           }
           lastByte = millis();
@@ -1157,7 +1438,8 @@ end:
               const int c = stream.read();
               if (c >= 0) { return c; }
               // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1c
-              delay(10);
+              // 15.11.2026 - Measure UART waits only with OTA diagnostics enabled.
+              waitForInput();
             }
             return -1;
           };
@@ -1172,7 +1454,10 @@ end:
           // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
           // New arrivals cannot invalidate the saved lower bound. Preserve
           // got_data so additional bytes are checked when this bound runs out.
-          if (confirmed < requested || buffered >= availableBefore) {
+          // 15.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
+          // A positive short read does not prove that the modem buffer is empty.
+          // Preserve the known remainder; a zero read corrects a stale count.
+          if (buffered == 0 || buffered >= availableBefore) {
             sock->sock_available = 0;
           } else {
             sock->sock_available = availableBefore - buffered;
@@ -1203,6 +1488,42 @@ end:
             DBGLOG(Error, "[TinyGsmSim7080] AT resynchronization failed; modem recovery required.")
           }
         }
+        // 15.11.2026 - Optional OTA diagnostics.
+        TINY_GSM_OTA_DIAG(
+        if (diagnose) {
+          ReceiveDiagnostics& d = receiveDiagnostics_;
+          d.readUs += static_cast<uint32_t>(micros() - diagnosticStartedUs);
+          // 16.11.2026 - Track successful UART payload progress per read, not
+          // per byte. Failed frames remain identifiable through failedReads.
+          if (complete && buffered > 0) {
+            const uint32_t now = millis();
+            if (receiveDiagnosticsState_.readSeen) {
+              const uint32_t gap = now - receiveDiagnosticsLastReadMs_;
+              if (gap > receiveDiagnosticsState_.maxReadGapMs) {
+                receiveDiagnosticsState_.maxReadGapMs = gap;
+              }
+            }
+            receiveDiagnosticsState_.readSeen = true;
+            receiveDiagnosticsLastReadMs_ = now;
+            // 16.11.2026 - Actual payload ends an empty-query observation run,
+            // even if the historical raw snapshot still reports zero bytes.
+            receiveDiagnosticsState_.emptySnapshotRunCount = 0;
+            receiveDiagnosticsEmptyRunStartedMs_ = 0;
+          }
+          if (!complete) {
+            ++d.failedReads;
+          } else {
+            d.readBytes += buffered;
+            if (buffered == 0) {
+              ++d.zeroReads;
+            } else if (buffered < requested) {
+              ++d.shortReads;
+            }
+            if (buffered == 1023) { ++d.reads1023; }
+            if (buffered == 437) { ++d.reads437; }
+          }
+        }
+        )
       }
     }
 
@@ -1284,6 +1605,33 @@ end:
 
     constexpr uint32_t timeoutMs = 3000L;
     const uint32_t started = millis();
+    // 15.11.2026 - Optional OTA diagnostics.
+    TINY_GSM_OTA_DIAG(
+    const bool diagnose = receiveDiagnostics_.active;
+    const uint32_t diagnosticStartedUs = diagnose ? micros() : 0;
+    if (diagnose) {
+      ReceiveDiagnostics& d = receiveDiagnostics_;
+      if (d.availableQueries > 0) {
+        const uint32_t gap = started - receiveDiagnosticsLastQueryMs_;
+        if (d.queryGapCount == 0 || gap < d.queryGapMinMs) {
+          d.queryGapMinMs = gap;
+        }
+        if (gap > d.queryGapMaxMs) { d.queryGapMaxMs = gap; }
+        ++d.queryGapCount;
+        d.queryGapSumMs += gap;
+        if (gap >= 400 && gap <= 650) { ++d.queryGaps400to650; }
+      }
+      receiveDiagnosticsLastQueryMs_ = started;
+      ++d.availableQueries;
+      if (!socketAvailableChecked_) {
+        ++d.initialQueries;
+      } else if (started - lastSocketAvailableCheck_ >= socketAvailableCheckInterval()) {
+        ++d.periodicQueries;
+      } else {
+        ++d.notificationQueries;
+      }
+    }
+    )
     bool valid = true;
     bool success = false;
     sendAT(GF("+CARECV?"));
@@ -1310,6 +1658,40 @@ end:
     }
 
     const uint32_t checkedAt = millis();
+    // 15.11.2026 - Optional OTA diagnostics.
+    TINY_GSM_OTA_DIAG(
+    if (diagnose) {
+      ReceiveDiagnostics& d = receiveDiagnostics_;
+      d.availableQueryUs += static_cast<uint32_t>(micros() - diagnosticStartedUs);
+      // 16.11.2026 - Preserve the last successful raw snapshot separately from
+      // the latest query result and from the client's mutable unread count.
+      ReceiveDiagnosticsState& state = receiveDiagnosticsState_;
+      state.querySeen = true;
+      state.lastQuerySucceeded = success;
+      receiveDiagnosticsLastStateQueryMs_ = checkedAt;
+      if (success) {
+        state.snapshotSeen = true;
+        state.lastSnapshotBytes = snapshot[d.mux];
+        receiveDiagnosticsLastSnapshotMs_ = checkedAt;
+      }
+      if (success && snapshot[d.mux] == 0) {
+        if (state.emptySnapshotRunCount == 0) {
+          receiveDiagnosticsEmptyRunStartedMs_ = checkedAt;
+        }
+        ++state.emptySnapshotRunCount;
+      } else {
+        state.emptySnapshotRunCount = 0;
+      }
+      if (!success) {
+        ++d.availableQueryErrors;
+      } else if (snapshot[d.mux] > 0) {
+        ++d.nonzeroSnapshots;
+        d.snapshotBytes += snapshot[d.mux];
+      }
+    }
+    )
+    // 16.11.2026 - A reset during this query invalidated the entire snapshot.
+    if (!atStreamSynchronized_) { return 0; }
     lastSocketAvailableCheck_ = checkedAt;
     socketAvailableChecked_ = true;
     socketAvailableCheckFailed_ = !success;
@@ -1351,6 +1733,12 @@ end:
     bool snapshot[TINY_GSM_MUX_COUNT] = {};
     constexpr uint32_t timeoutMs = 3000L;
     const uint32_t started = millis();
+    // 15.11.2026 - Optional OTA diagnostics.
+    TINY_GSM_OTA_DIAG(
+    const bool diagnose = receiveDiagnostics_.active;
+    const uint32_t diagnosticStartedUs = diagnose ? micros() : 0;
+    if (diagnose) { ++receiveDiagnostics_.stateQueries; }
+    )
     bool valid = true;
     bool success = false;
     sendAT(GF("+CASTATE?"));
@@ -1375,6 +1763,15 @@ end:
       }
     }
 
+    // 15.11.2026 - Optional OTA diagnostics.
+    TINY_GSM_OTA_DIAG(
+    if (diagnose) {
+      receiveDiagnostics_.stateQueryUs +=
+          static_cast<uint32_t>(micros() - diagnosticStartedUs);
+    }
+    )
+    // 16.11.2026 - Preserve reset invalidation if a URC aborted this query.
+    if (!atStreamSynchronized_) { return false; }
     lastSocketStateCheck_ = millis();
     socketStateChecked_ = true;
     bool result = false;
@@ -1407,6 +1804,12 @@ end:
       size_t len = streamGetSizeBefore('\n');
       // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
       if (mux < TINY_GSM_MUX_COUNT && sockets[mux] && !sockets[mux]->sock_stopped) {
+        // 15.11.2026 - Optional OTA diagnostics.
+        TINY_GSM_OTA_DIAG(
+        if (receiveDiagnostics_.active && receiveDiagnostics_.mux == mux) {
+          ++receiveDiagnostics_.recvUrcs;
+        }
+        )
         sockets[mux]->got_data = true;
         DBGCHK(Error, len <=1024, "[TinyGsmSim7080] len (%zu) out of range [0..1024]!", len)
         if (len <= 1024) { sockets[mux]->sock_available = len; }
@@ -1418,6 +1821,12 @@ end:
       uint8_t mux = streamGetUInt8Before('\n');
       // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
       if (mux < TINY_GSM_MUX_COUNT && sockets[mux] && !sockets[mux]->sock_stopped) {
+        // 15.11.2026 - Optional OTA diagnostics.
+        TINY_GSM_OTA_DIAG(
+        if (receiveDiagnostics_.active && receiveDiagnostics_.mux == mux) {
+          ++receiveDiagnostics_.dataUrcs;
+        }
+        )
         sockets[mux]->got_data = true;
       }
       data = "";
@@ -1471,9 +1880,25 @@ end:
       return true;
     } else if (data.endsWith(GF(AT_NL "SMS Ready" AT_NL))) {
       data = "";
-      DBGLOG(Warn, "{TinyGsmSim7080} Unexpected module reset!")
-//      init();
-      data = "";
+      // 16.11.2026 - Never run init/restart recursively from a URC parser.
+      // The modem has lost every socket; keep client attachments/MUX ownership
+      // until their owners can stop and destroy the affected clients safely.
+      const bool bootGrace = modemBootGraceActive_ &&
+          millis() - modemBootGraceStartedMs_ < 5000L;
+      const bool expectedBoot = !modemBootNotificationSeen_ &&
+          (expectedModemBoot_ || initRunning || restartRunning_);
+      if (expectedBoot || bootGrace) {
+        modemBootNotificationSeen_ = true;
+        modemBootGraceActive_ = false;
+        resetModemSocketState(true);
+        DBGLOG(Info, "{TinyGsmSim7080} Expected modem boot notification.")
+      } else {
+        modemBootGraceActive_ = false;
+        atStreamSynchronized_ = false;
+        resetModemSocketState(true);
+        modemRecoveryRequired_.store(true, std::memory_order_release);
+        DBGLOG(Error, "{TinyGsmSim7080} Unexpected module reset; sockets invalidated, recovery deferred to GSM owner.")
+      }
       return true;
     } 
 // <MS>
@@ -1505,14 +1930,69 @@ end:
   } // ::handleURCs(...)
 
  protected:
+  // 16.11.2026 - Only the pending flag is read outside the AT semaphore.
+  std::atomic<bool> modemRecoveryRequired_{false};
+  bool expectedModemBoot_ = false;
+  bool modemBootNotificationSeen_ = false;
+  bool restartRunning_ = false;
+  bool modemBootGraceActive_ = false;
+  uint32_t modemBootGraceStartedMs_ = 0;
+
+  // Called with the AT semaphore held; a confirmed reboot releases modem slots.
+  void resetModemSocketState(bool rebooted) {
+    for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; ++mux) {
+      if (sockets[mux]) { sockets[mux]->resetSocketState(); }
+      if (rebooted) { socketClosePending_[mux] = false; }
+    }
+    invalidateSocketChecks();
+  }
+
+  // 15.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 1d
+  // A CAOPEN attempt needs confirmed cleanup. Keep this per mux, independent
+  // of local state resets and client replacement. A remote close alone does
+  // not confirm release; raw receive-recovery cleanup discards its reply.
+  bool socketClosePending_[TINY_GSM_MUX_COUNT] = {};
+
+#if defined(MS_OTA_DIAGNOSTICS)
+  // 15.11.2026 - Optional OTA diagnostics.
+  ReceiveDiagnostics receiveDiagnostics_;
+  uint32_t receiveDiagnosticsStartedMs_ = 0;
+  uint32_t receiveDiagnosticsLastQueryMs_ = 0;
+  // 16.11.2026 - Times for nonblocking cached snapshots at TLS failures.
+  ReceiveDiagnosticsState receiveDiagnosticsState_;
+  uint32_t receiveDiagnosticsLastStateQueryMs_ = 0;
+  uint32_t receiveDiagnosticsLastSnapshotMs_ = 0;
+  uint32_t receiveDiagnosticsLastReadMs_ = 0;
+  uint32_t receiveDiagnosticsEmptyRunStartedMs_ = 0;
+#endif
+
   // 14.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 2
   // CARECV? and CASTATE? each describe every socket, so polling is modem-wide.
-  static constexpr uint32_t socketCheckIntervalMs = 500L;
+  // 15.11.2026 - Separate data polling from status checks and error retries.
+  static constexpr uint32_t socketAvailableCheckDefaultIntervalMs = 500L;
+  static constexpr uint32_t socketStateCheckIntervalMs = 500L;
+  static constexpr uint32_t socketAvailableRetryIntervalMs = 500L;
+  uint32_t socketAvailableCheckIntervals_[TINY_GSM_MUX_COUNT] = {};
   uint32_t lastSocketAvailableCheck_ = 0;
   uint32_t lastSocketStateCheck_ = 0;
   bool socketAvailableChecked_ = false;
   bool socketStateChecked_ = false;
   bool socketAvailableCheckFailed_ = false;
+
+  // Only attached clients with an active connection attempt/session may
+  // shorten the modem-wide data interval. Failed queries retain 500 ms backoff.
+  uint32_t socketAvailableCheckInterval() const {
+    if (socketAvailableCheckFailed_) { return socketAvailableRetryIntervalMs; }
+    uint32_t intervalMs = socketAvailableCheckDefaultIntervalMs;
+    for (uint8_t mux = 0; mux < TINY_GSM_MUX_COUNT; ++mux) {
+      const GsmClientSim7080* sock = sockets[mux];
+      if (sock && sock->isAttached() && !sock->sock_stopped &&
+          socketAvailableCheckIntervals_[mux] > 0) {
+        intervalMs = TinyGsmMin(intervalMs, socketAvailableCheckIntervals_[mux]);
+      }
+    }
+    return intervalMs;
+  }
 
   void invalidateSocketChecks() {
     socketAvailableChecked_ = false;
@@ -1523,5 +2003,7 @@ end:
   GsmClientSim7080* sockets[TINY_GSM_MUX_COUNT];
 //  String            certificates[TINY_GSM_MUX_COUNT];
 }; // class TinyGsmSim7080
+
+#undef TINY_GSM_OTA_DIAG
 
 #endif  // SRC_TINYGSMCLIENTSIM7080_H_
