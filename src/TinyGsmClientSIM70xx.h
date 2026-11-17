@@ -380,73 +380,112 @@ end:
     return res;
   }
 
-  // get GPS informations
+  // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 6
+  // SIM7070/7080/7090 return 18 fields; SIM7000 returns 21. Read one complete
+  // row instead of waiting for commas that do not exist in the shorter layout.
   bool getGPSImpl(float* lat, float* lon, float* speed = 0, float* alt = 0,
                   int* vsat = 0, int* usat = 0, float* accuracy = 0,
                   int* year = 0, int* month = 0, int* day = 0, int* hour = 0,
                   int* minute = 0, int* second = 0) {
-    thisModem().sendAT(GF("+CGNSINF"));
-    if (thisModem().waitResponse(10000L, GF(AT_NL "+CGNSINF:")) != 1) {
-      return false;
-    }
+    MS_TINY_GSM_SEM_TAKE_WAIT
 
-    thisModem().streamSkipUntil(',');                // GNSS run status
-    if (thisModem().streamGetIntBefore(',') == 1) {  // fix status
-      // init variables
-      float ilat         = 0;
-      float ilon         = 0;
-      float ispeed       = 0;
-      float ialt         = 0;
-      int   ivsat        = 0;
-      int   iusat        = 0;
-      float iaccuracy    = 0;
-      int   iyear        = 0;
-      int   imonth       = 0;
-      int   iday         = 0;
-      int   ihour        = 0;
-      int   imin         = 0;
+    const bool success = [&]() -> bool {
+      thisModem().sendAT(GF("+CGNSINF"));
+      if (thisModem().waitResponse(10000L, GF(AT_NL "+CGNSINF:")) != 1) {
+        return false;
+      }
+
+      char row[512];
+      const bool complete = thisModem().streamGetCharBefore('\n', row, sizeof(row)) != nullptr;
+      const bool acknowledged = thisModem().waitResponse() == 1;
+      if (!complete || !acknowledged) { return false; }
+
+      char* fields[21] = {row};
+      size_t count = 1;
+      for (char* p = row; *p; ++p) {
+        if (*p == ',') {
+          if (count == 21) { return false; }
+          *p = '\0';
+          fields[count++] = p + 1;
+        }
+      }
+      if (count != 18 && count != 21) { return false; }
+      for (size_t i = 0; i < count; ++i) {
+        while (*fields[i] && this->isIntegerWhitespace(*fields[i])) { ++fields[i]; }
+        char* end = fields[i] + strlen(fields[i]);
+        while (end > fields[i] && this->isIntegerWhitespace(end[-1])) { --end; }
+        *end = '\0';
+      }
+
+      const auto readInt = [&](size_t field, int& value) -> bool {
+        return this->parseIntegerToken(fields[field], strlen(fields[field]), value);
+      };
+      const auto readFloat = [&](size_t field, float& value) -> bool {
+        return this->parseFloatToken(fields[field], strlen(fields[field]), value);
+      };
+      int running = 0;
+      int fixed = 0;
+      if (!readInt(0, running) || !readInt(1, fixed) || running != 1 || fixed != 1) {
+        return false;
+      }
+
+      // YYYYMMDDhhmmss[.fraction], UTC. Empty timestamps are valid without a
+      // fix, but a successful position must include a complete valid date.
+      char* utc = fields[2];
+      const size_t utcLength = strlen(utc);
+      if (utcLength < 14) { return false; }
+      for (size_t i = 0; i < 14; ++i) {
+        if (utc[i] < '0' || utc[i] > '9') { return false; }
+      }
+      if (utcLength > 14) {
+        if (utc[14] != '.' || utcLength == 15) { return false; }
+        for (size_t i = 15; i < utcLength; ++i) {
+          if (utc[i] < '0' || utc[i] > '9') { return false; }
+        }
+      }
+
+      int iyear = 0, imonth = 0, iday = 0, ihour = 0, imin = 0;
       float secondWithSS = 0;
+      if (!this->parseIntegerToken(utc, 4, iyear) ||
+          !this->parseIntegerToken(utc + 4, 2, imonth) ||
+          !this->parseIntegerToken(utc + 6, 2, iday) ||
+          !this->parseIntegerToken(utc + 8, 2, ihour) ||
+          !this->parseIntegerToken(utc + 10, 2, imin) ||
+          !this->parseFloatToken(utc + 12, utcLength - 12, secondWithSS)) {
+        return false;
+      }
+      if (iyear < 1980 || imonth < 1 || imonth > 12 || iday < 1 ||
+          ihour > 23 || imin > 59 || secondWithSS < 0 || secondWithSS >= 61) {
+        return false;
+      }
+      const uint8_t daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+      const bool leapYear = iyear % 4 == 0 && (iyear % 100 != 0 || iyear % 400 == 0);
+      const int maxDay = daysInMonth[imonth - 1] + (imonth == 2 && leapYear ? 1 : 0);
+      if (iday > maxDay) { return false; }
 
-      // UTC date & Time
-      iyear        = thisModem().streamGetIntLength(4);  // Four digit year
-      imonth       = thisModem().streamGetIntLength(2);  // Two digit month
-      iday         = thisModem().streamGetIntLength(2);  // Two digit day
-      ihour        = thisModem().streamGetIntLength(2);  // Two digit hour
-      imin         = thisModem().streamGetIntLength(2);  // Two digit minute
-      secondWithSS = thisModem().streamGetFloatBefore(
-          ',');  // 6 digit second with subseconds
+      float ilat = 0, ilon = 0, ialt = 0, ispeed = 0, iaccuracy = 0;
+      int ivsat = 0, iusat = 0;
+      if (!readFloat(3, ilat) || !readFloat(4, ilon) || !readFloat(5, ialt) ||
+          !readFloat(6, ispeed) || !readFloat(10, iaccuracy) || !readInt(14, ivsat) ||
+          ilat < -90 || ilat > 90 || ilon < -180 || ilon > 180 ||
+          ispeed < 0 || ispeed > 999.99f || iaccuracy < 0 || iaccuracy > 99.9f ||
+          ivsat < 0 || ivsat > 99) {
+        return false;
+      }
+      // The short 18-field layout has no satellites-used value. Its field 16
+      // is reserved, not USAT; return 0 for that unavailable measurement.
+      if (count == 21 && (!readInt(15, iusat) || iusat < 0 || iusat > 99)) {
+        return false;
+      }
 
-      ilat = thisModem().streamGetFloatBefore(',');  // Latitude
-      ilon = thisModem().streamGetFloatBefore(',');  // Longitude
-      ialt = thisModem().streamGetFloatBefore(
-          ',');  // MSL Altitude. Unit is meters
-      ispeed = thisModem().streamGetFloatBefore(
-          ',');                          // Speed Over Ground. Unit is knots.
-      thisModem().streamSkipUntil(',');  // Course Over Ground. Degrees.
-      thisModem().streamSkipUntil(',');  // Fix Mode
-      thisModem().streamSkipUntil(',');  // Reserved1
-      iaccuracy = thisModem().streamGetFloatBefore(
-          ',');                          // Horizontal Dilution Of Precision
-      thisModem().streamSkipUntil(',');  // Position Dilution Of Precision
-      thisModem().streamSkipUntil(',');  // Vertical Dilution Of Precision
-      thisModem().streamSkipUntil(',');  // Reserved2
-      ivsat = thisModem().streamGetIntBefore(',');  // GNSS Satellites in View
-      iusat = thisModem().streamGetIntBefore(',');  // GNSS Satellites Used
-      thisModem().streamSkipUntil(',');             // GLONASS Satellites Used
-      thisModem().streamSkipUntil(',');             // Reserved3
-      thisModem().streamSkipUntil(',');             // C/N0 max
-      thisModem().streamSkipUntil(',');             // HPA
-      thisModem().streamSkipUntil('\n');            // VPA
-
-      // Set pointers
+      // Publish only after a complete row, final OK and all required values.
       if (lat != nullptr) *lat = ilat;
       if (lon != nullptr) *lon = ilon;
-      if (speed != nullptr) *speed = ispeed;
+      if (speed != nullptr) *speed = ispeed;  // Speed over ground, km/h.
       if (alt != nullptr) *alt = ialt;
       if (vsat != nullptr) *vsat = ivsat;
       if (usat != nullptr) *usat = iusat;
-      if (accuracy != nullptr) *accuracy = iaccuracy;
-      if (iyear < 2000) iyear += 2000;
+      if (accuracy != nullptr) *accuracy = iaccuracy;  // HDOP, not meters.
       if (year != nullptr) *year = iyear;
       if (month != nullptr) *month = imonth;
       if (day != nullptr) *day = iday;
@@ -454,13 +493,11 @@ end:
       if (minute != nullptr) *minute = imin;
       if (second != nullptr) *second = static_cast<int>(secondWithSS);
 
-      thisModem().waitResponse();
       return true;
-    }
+    }();
 
-    thisModem().streamSkipUntil('\n');  // toss the row of commas
-    thisModem().waitResponse();
-    return false;
+    MS_TINY_GSM_SEM_GIVE_WAIT
+    return success;
   }
   bool handleURCs(String& data) {
     return thisModem().handleURCs(data);
