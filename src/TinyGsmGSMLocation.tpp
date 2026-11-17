@@ -114,7 +114,9 @@ class TinyGsmGSMLocation {
     thisModem().sendAT(GF("+CLBS=1,1"));
     // Should get a location code of "0" indicating success
     if (thisModem().waitResponse(120000L, GF("+CLBS: ")) != 1) { return ""; }
-    int8_t locationCode = static_cast<int8_t>(thisModem().streamGetIntLength(2));
+    // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4a
+    // The comma terminates the status field; it is not a numeric character.
+    const int locationCode = thisModem().streamGetIntegerBefore(',');
     // 0 = success, else, error
     if (locationCode != 0) {
       thisModem().waitResponse();  // should be an ok after the error
@@ -136,7 +138,8 @@ class TinyGsmGSMLocation {
     thisModem().sendAT(GF("+CLBS=4,1"));
     // Should get a location code of "0" indicating success
     if (thisModem().waitResponse(120000L, GF("+CLBS: ")) != 1) { return false; }
-    int8_t locationCode = static_cast<int8_t>(thisModem().streamGetIntLength(2));
+    // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4a
+    const int locationCode = thisModem().streamGetIntegerBefore(',');
     // 0 = success, else, error
     if (locationCode != 0) {
       thisModem().waitResponse();  // should be an ok after the error

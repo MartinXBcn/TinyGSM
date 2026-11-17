@@ -10,6 +10,7 @@
 #define SRC_TINYGSMMODEM_H_
 
 #include "TinyGsmCommon.h"
+#include <limits.h>
 
 #ifndef AT_NL
 #define AT_NL "\r\n"
@@ -520,36 +521,106 @@ class TinyGsmModem {
   }
 
  protected:
+  // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4a
+  // Share one deadline across the exact read; Stream::readBytes() otherwise
+  // starts a new timeout for each byte. Keep the Stream timeout unchanged.
   inline bool streamGetLength(char* buf, int8_t numChars,
                               const uint32_t timeout_ms = 1000L) {
     if (!buf || numChars < 0) { return false; }
-    if (numChars == 0) { return true; }
+    const uint32_t started = millis();
+    for (int i = 0; i < numChars; ++i) {
+      int c;
+      do {
+        if (timeout_ms && millis() - started >= timeout_ms) { return false; }
+        c = thisModem().stream.read();
+        if (c < 0) {
+          if (!timeout_ms) { return false; }
+          TINY_GSM_YIELD();
+        }
+      } while (c < 0);
+      buf[i] = static_cast<char>(c);
+    }
+    return true;
+  }
 
-    int numCharsReady = -1;
-    const uint32_t startMillis = millis();
+  // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4a
+  // Keep the fork's full int range (including EARFCN), not upstream's int16_t.
+  // A fixed buffer covers the sign, all decimal digits and AT whitespace.
+  static constexpr size_t integerTokenBufferSize = sizeof(int) * 3 + 4;
 
-    while (millis() - startMillis < timeout_ms &&
-          (numCharsReady = thisModem().stream.available()) < numChars) {
-      TINY_GSM_YIELD();
+  static inline bool isIntegerWhitespace(char c) {
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+  }
+
+  static inline bool parseIntegerToken(const char* buf, size_t length,
+                                       int& value) {
+    if (!buf || !length) { return false; }
+    size_t i = 0;
+    while (i < length && isIntegerWhitespace(buf[i])) { ++i; }
+    bool negative = false;
+    if (i < length && (buf[i] == '+' || buf[i] == '-')) {
+      negative = buf[i++] == '-';
     }
 
-    if (numCharsReady < numChars) { return false; }
+    const unsigned int limit = negative ?
+        static_cast<unsigned int>(-(INT_MIN + 1)) + 1U :
+        static_cast<unsigned int>(INT_MAX);
+    unsigned int magnitude = 0;
+    const size_t digitsStarted = i;
+    while (i < length && buf[i] >= '0' && buf[i] <= '9') {
+      const unsigned int digit = static_cast<unsigned int>(buf[i++] - '0');
+      if (magnitude > (limit - digit) / 10U) { return false; }
+      magnitude = magnitude * 10U + digit;
+    }
+    if (i == digitsStarted) { return false; }
+    while (i < length && isIntegerWhitespace(buf[i])) { ++i; }
+    if (i != length) { return false; }
 
-    const size_t requested = static_cast<size_t>(numChars);
-    return thisModem().stream.readBytes(buf, requested) == requested;
+    value = negative ? (magnitude == limit ? INT_MIN :
+        -static_cast<int>(magnitude)) : static_cast<int>(magnitude);
+    return true;
+  }
+
+  // A delimiter must actually arrive. On overflow, consume the rest of this
+  // field within the same deadline so its tail cannot become the next value.
+  inline bool streamReadIntegerToken(char* buf, size_t capacity, char lastChar,
+                                      size_t& length) {
+    length = 0;
+    if (!buf || capacity < 2) { return false; }
+    buf[0] = '\0';
+    bool overflow = false;
+    const uint32_t timeoutMs = thisModem().stream.getTimeout();
+    const uint32_t started = millis();
+    int buffered = timeoutMs == 0 ? thisModem().stream.available() : 0;
+    while (true) {
+      if (timeoutMs && millis() - started >= timeoutMs) { return false; }
+      if (!timeoutMs && buffered-- <= 0) { return false; }
+      const int c = thisModem().stream.read();
+      if (c < 0) {
+        if (!timeoutMs) { return false; }
+        TINY_GSM_YIELD();
+        continue;
+      }
+      if (c == lastChar) { return !overflow; }
+      // Do not consume another AT line looking for a missing field delimiter.
+      if (c == '\n') { return false; }
+      if (length + 1 < capacity) {
+        buf[length++] = static_cast<char>(c);
+        buf[length] = '\0';
+      } else {
+        overflow = true;
+      }
+    }
   }
 
   inline int streamGetIntLength(int8_t numChars, const uint32_t timeout_ms = 1000L) {
-    DBGCHK(Error, numChars >= 0, "%s""numChars must be >= 0", tag_tgm)
-    if (numChars < 0) { return -9999; }
-    
-    char buf[static_cast<unsigned int>(numChars) + 1];
-    if (streamGetLength(buf, numChars, timeout_ms)) {
-      buf[static_cast<unsigned int>(numChars)] = '\0';
-      return atoi(buf);
+    if (numChars <= 0 || static_cast<size_t>(numChars) >= integerTokenBufferSize) {
+      return -9999;
     }
-
-    return -9999;
+    char buf[integerTokenBufferSize];
+    int value = 0;
+    return streamGetLength(buf, numChars, timeout_ms) &&
+        parseIntegerToken(buf, static_cast<size_t>(numChars), value) ? value : -9999;
   }
 
   // Compatibility wrapper for existing template implementations.
@@ -558,15 +629,14 @@ class TinyGsmModem {
   }
 
   inline int streamGetIntegerBefore(char lastChar) {
-    char   buf[7];
-    size_t bytesRead = thisModem().stream.readBytesUntil(lastChar, buf, 7);
-    // if we read 7 or more bytes, it's an overflow
-    if (bytesRead && bytesRead < 7) {
-      buf[bytesRead] = '\0';
-      return atoi(buf);
+    char buf[integerTokenBufferSize];
+    size_t length = 0;
+    int value = 0;
+    if (streamReadIntegerToken(buf, sizeof(buf), lastChar, length) &&
+        parseIntegerToken(buf, length, value)) {
+      return value;
     }
-
-    DBGLOG(Error, "%s""integer-overflow", tag_tgm)
+    DBGLOG(Error, "%s""invalid, incomplete or out-of-range integer field", tag_tgm)
     return -1;
   }
 

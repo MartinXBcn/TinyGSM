@@ -144,7 +144,6 @@ class TinyGsmTime {
     int imin      = 0;
     int isec      = 0;
     int itimezone = 0;
-    char tzSign;
     bool ret = false;
 
 
@@ -171,9 +170,9 @@ class TinyGsmTime {
     ihour       = thisModem().streamGetIntegerBefore(':');
     imin        = thisModem().streamGetIntegerBefore(':');
     isec        = thisModem().streamGetIntLength(2);
-    tzSign      = static_cast<char>(thisModem().stream.read());
-    itimezone   = thisModem().streamGetIntegerBefore('\n');
-    if (tzSign == '-') { itimezone = itimezone * -1; }
+    // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4a
+    // Read the signed timezone inside CCLK's quotes, not the closing quote.
+    itimezone   = thisModem().streamGetIntegerBefore('"');
 
     // Set pointers
     if (iyear < 2000) iyear += 2000;

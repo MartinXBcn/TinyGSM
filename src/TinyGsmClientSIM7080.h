@@ -18,6 +18,8 @@
 #include <atomic>
 
 
+// 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 3
+// Socket slots 0..11 are independent of the modem's SSL profiles 0..5.
 #define TINY_GSM_MUX_COUNT 12
 #define TINY_GSM_BUFFER_READ_AND_CHECK_SIZE
 
@@ -1102,9 +1104,7 @@ DBGCOD(
     if (ssl) {
       // set the ssl version
       // AT+CSSLCFG="SSLVERSION",<ctxindex>,<sslversion>
-      // <ctxindex> PDP context identifier - for reasons not understood by me,
-      //            use PDP context identifier of 0 for what we defined as 1 in
-      //            the gprsConnect function
+      // <ctxindex> SSL configuration profile (0..5), not a PDP context or MUX.
       // <sslversion> 0: QAPI_NET_SSL_PROTOCOL_UNKNOWN
       //              1: QAPI_NET_SSL_PROTOCOL_TLS_1_0
       //              2: QAPI_NET_SSL_PROTOCOL_TLS_1_1
@@ -1114,7 +1114,6 @@ DBGCOD(
       // NOTE:  despite docs using caps, "sslversion" must be in lower case
 // <MS>
       sendAT(GF("+CSSLCFG=\"sslversion\",0,3"));  // TLS 1.2
-//      sendAT(GF("+CSSLCFG=\"sslversion\","), mux, GF(",3"));  // TLS 1.2
 // <MS>      
       if (waitResponse(5000L) != 1)  { 
         DBGLOG(Error, "[TinyGsmSim7080] (mux: %hhu) Set the ssl version failed.", mux);
@@ -1131,21 +1130,14 @@ DBGCOD(
     waitResponse();
 
     if (ssl) {
-// <MS> NEW
-//      sendAT(GF("+CASSLCFG="), mux, ',', GF("crindex,"), mux);
-//      waitResponse();
-// <MS>
-
-      // set the PDP context to apply SSL to
+      // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 3
+      // Native TLS currently uses profile 0. Explicit socket/profile mapping
+      // via CASSLCFG/CRINDEX remains part of the deferred native-TLS work.
+      // Query the SSL profile; CTXINDEX does not assign it to a socket.
       // AT+CSSLCFG="CTXINDEX",<ctxindex>
-      // <ctxindex> PDP context identifier - for reasons not understood by me,
-      //            use PDP context identifier of 0 for what we defined as 1 in
-      //            the gprsConnect function
-      // NOTE:  despite docs using "CRINDEX" in all caps, the module only
-      // accepts the command "ctxindex" and it must be in lower case
+      // <ctxindex> SSL configuration profile (0..5).
 // <MS>      
       sendAT(GF("+CSSLCFG=\"ctxindex\",0"));
-//      sendAT(GF("+CSSLCFG=\"ctxindex\","), mux);
 // <MS>      
       if (waitResponse(5000L, GF("+CSSLCFG:")) != 1)  { 
         DBGLOG(Error, "[TinyGsmSim7080] (mux: %hhu) +CSSLCFG=\'ctxindex\' failed.", mux);
@@ -1174,12 +1166,9 @@ DBGCOD(
 
       // set the SSL SNI (server name indication)
       // AT+CSSLCFG="SNI",<ctxindex>,<servername>
-      // <ctxindex> PDP context identifier - for reasons not understood by me,
-      //            use PDP context identifier of 0 for what we defined as 1 in
-      //            the gprsConnect function
+      // <ctxindex> SSL configuration profile (0..5), independent of the MUX.
       // NOTE:  despite docs using caps, "sni" must be in lower case
       DBGLOG(Info, "[TinyGsmSim7080] (mux: %hhu)  +CSSLCFG=/sni/ ...", mux)
-//      sendAT(GF("+CSSLCFG=\"sni\","), mux, ',', GF("\""), host, GF("\""));
       sendAT(GF("+CSSLCFG=\"sni\",0,"), GF("\""), host, GF("\""));
       waitResponse();
     }
