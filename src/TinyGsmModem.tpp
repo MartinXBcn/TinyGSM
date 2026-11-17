@@ -10,7 +10,10 @@
 #define SRC_TINYGSMMODEM_H_
 
 #include "TinyGsmCommon.h"
+#include <errno.h>
+#include <float.h>
 #include <limits.h>
+#include <stdlib.h>
 
 #ifndef AT_NL
 #define AT_NL "\r\n"
@@ -683,39 +686,124 @@ class TinyGsmModem {
     return static_cast<size_t>(i);
   }
 
+  // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4b
+  // Keep decimal/scientific notation accepted by atof(), but validate the
+  // complete token before conversion. Buffers always reserve a terminating NUL.
+  static constexpr size_t floatTokenBufferSize = 64;
+
+  static inline bool parseFloatToken(char* buf, size_t length, float& value) {
+    if (!buf || !length || length >= floatTokenBufferSize) { return false; }
+    size_t i = 0;
+    while (i < length && isIntegerWhitespace(buf[i])) { ++i; }
+    const size_t numberStarted = i;
+    if (i < length && (buf[i] == '+' || buf[i] == '-')) { ++i; }
+    bool digits = false;
+    bool nonzero = false;
+    while (i < length && buf[i] >= '0' && buf[i] <= '9') {
+      digits = true;
+      nonzero = nonzero || buf[i] != '0';
+      ++i;
+    }
+    if (i < length && buf[i] == '.') {
+      ++i;
+      while (i < length && buf[i] >= '0' && buf[i] <= '9') {
+        digits = true;
+        nonzero = nonzero || buf[i] != '0';
+        ++i;
+      }
+    }
+    if (!digits) { return false; }
+    if (i < length && (buf[i] == 'e' || buf[i] == 'E')) {
+      ++i;
+      if (i < length && (buf[i] == '+' || buf[i] == '-')) { ++i; }
+      const size_t exponentStarted = i;
+      while (i < length && buf[i] >= '0' && buf[i] <= '9') { ++i; }
+      if (i == exponentStarted) { return false; }
+    }
+    const size_t numberEnded = i;
+    while (i < length && isIntegerWhitespace(buf[i])) { ++i; }
+    if (i != length) { return false; }
+
+    const char saved = buf[numberEnded];
+    buf[numberEnded] = '\0';
+    const int savedErrno = errno;
+    errno = 0;
+    char* end = nullptr;
+    const float parsed = strtof(buf + numberStarted, &end);
+    const int conversionErrno = errno;
+    errno = savedErrno;
+    buf[numberEnded] = saved;
+
+    if (end != buf + numberEnded || !(parsed >= -FLT_MAX && parsed <= FLT_MAX)) {
+      return false;
+    }
+    // A nonzero decimal must not silently become zero. Representable subnormal
+    // values remain usable even if the C library reports ERANGE for them.
+    if ((nonzero && parsed == 0.0F) ||
+        (conversionErrno == ERANGE && (parsed >= FLT_MIN || parsed <= -FLT_MIN)) ||
+        (conversionErrno != 0 && conversionErrno != ERANGE)) {
+      return false;
+    }
+    value = parsed;
+    return true;
+  }
+
   inline float streamGetFloatLength(int8_t         numChars,
                                     const uint32_t timeout_ms = 1000L) {
-    DBGCHK(Error, numChars >= 0, "%s""numChars must be >= 0", tag_tgm)
-    if (numChars < 0) { return -9999.0F; }
-    
-    char buf[static_cast<unsigned int>(numChars) + 1];
-    if (streamGetLength(buf, numChars, timeout_ms)) {
-      buf[static_cast<unsigned int>(numChars)] = '\0';
-      return atof(buf);
+    if (numChars <= 0 || static_cast<size_t>(numChars) >= floatTokenBufferSize) {
+      return -9999.0F;
     }
-
-    return -9999.0F;
+    char buf[floatTokenBufferSize];
+    if (!streamGetLength(buf, numChars, timeout_ms)) { return -9999.0F; }
+    buf[static_cast<size_t>(numChars)] = '\0';
+    float value = 0.0F;
+    return parseFloatToken(buf, static_cast<size_t>(numChars), value) ? value : -9999.0F;
   }
 
   inline float streamGetFloatBefore(char lastChar) {
-    char   buf[16];
-    size_t bytesRead = thisModem().stream.readBytesUntil(
-        lastChar, buf, static_cast<size_t>(16));
-    // if we read 16 or more bytes, it's an overflow
-    if (bytesRead && bytesRead < 16) {
-      buf[bytesRead] = '\0';
-      float res = static_cast<float>(atof(buf));
-      return res;
-    }
-
-    return -9999.0F;
+    char buf[floatTokenBufferSize];
+    size_t length = 0;
+    float value = 0.0F;
+    return streamReadIntegerToken(buf, sizeof(buf), lastChar, length) &&
+        parseFloatToken(buf, length, value) ? value : -9999.0F;
   }
 
-  // <MS>
+  // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4e
+  // Return only complete, non-truncated text fields. A failed read leaves a
+  // valid destination empty, while consuming this field within one deadline.
   inline char* streamGetCharBefore(char lastChar, char* dest, size_t dest_size) {
-    size_t bytesRead = thisModem().stream.readBytesUntil(lastChar, dest, dest_size - 1);
-    dest[bytesRead] = '\0';
-    return dest;
+    if (!dest || dest_size == 0) { return nullptr; }
+    dest[0] = '\0';
+    size_t length = 0;
+    bool valid = true;
+    const uint32_t timeoutMs = thisModem().stream.getTimeout();
+    const uint32_t started = millis();
+    int buffered = timeoutMs == 0 ? thisModem().stream.available() : 0;
+    while (true) {
+      if ((timeoutMs && millis() - started >= timeoutMs) ||
+          (!timeoutMs && buffered-- <= 0)) {
+        dest[0] = '\0';
+        return nullptr;
+      }
+      const int c = thisModem().stream.read();
+      if (c < 0) {
+        if (!timeoutMs) { dest[0] = '\0'; return nullptr; }
+        TINY_GSM_YIELD();
+        continue;
+      }
+      if (c == lastChar) {
+        if (!valid) { dest[0] = '\0'; return nullptr; }
+        return dest;
+      }
+      // A missing delimiter must not consume the following AT response line.
+      if (c == '\n') { dest[0] = '\0'; return nullptr; }
+      if (c == 0 || c > 0xFF || length + 1 >= dest_size) {
+        valid = false;
+      } else if (valid) {
+        dest[length++] = static_cast<char>(c);
+        dest[length] = '\0';
+      }
+    }
   }
 
 
@@ -749,26 +837,37 @@ class TinyGsmModem {
   }
 
   static inline IPAddress TinyGsmIpFromString(const String& strIP) {
-    int Parts[4] = {
-        0,
-    };
-    int Part = 0;
-    for (uint8_t i = 0; i < strIP.length(); i++) {
-      char c = strIP[i];
-      if (c == '.') {
-        Part++;
-        if (Part > 3) { return IPAddress(0, 0, 0, 0); }
-        continue;
-      } else if (c >= '0' && c <= '9') {
-        Parts[Part] *= 10;
-        Parts[Part] += c - '0';
-      } else {
-        if (Part == 3) break;
+    // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4c
+    // Accept a complete dotted quad, optionally framed by AT whitespace and
+    // one pair of quotes. Never scan through arbitrary prefixes or wrap octets.
+    size_t pos = 0;
+    size_t end = strIP.length();
+    while (pos < end && isIntegerWhitespace(strIP[pos])) { ++pos; }
+    while (end > pos && isIntegerWhitespace(strIP[end - 1])) { --end; }
+    if (pos < end && strIP[pos] == '"') {
+      if (end - pos < 2 || strIP[end - 1] != '"') { return IPAddress(0, 0, 0, 0); }
+      ++pos;
+      --end;
+    }
+
+    uint8_t parts[4] = {};
+    for (size_t part = 0; part < 4; ++part) {
+      unsigned int value = 0;
+      unsigned int digits = 0;
+      while (pos < end && strIP[pos] >= '0' && strIP[pos] <= '9') {
+        if (++digits > 3) { return IPAddress(0, 0, 0, 0); }
+        value = value * 10U + static_cast<unsigned int>(strIP[pos++] - '0');
+        if (value > 255) { return IPAddress(0, 0, 0, 0); }
+      }
+      if (!digits) { return IPAddress(0, 0, 0, 0); }
+      parts[part] = static_cast<uint8_t>(value);
+      if (part < 3) {
+        if (pos >= end || strIP[pos++] != '.') { return IPAddress(0, 0, 0, 0); }
+      } else if (pos != end) {
+        return IPAddress(0, 0, 0, 0);
       }
     }
-    return IPAddress(
-      static_cast<uint8_t>(Parts[0]), static_cast<uint8_t>(Parts[1]), 
-      static_cast<uint8_t>(Parts[2]), static_cast<uint8_t>(Parts[3]));
+    return IPAddress(parts[0], parts[1], parts[2], parts[3]);
   }
   /**@}*/
 

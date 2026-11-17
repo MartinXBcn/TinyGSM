@@ -1838,26 +1838,38 @@ end:
       data = "";
       return true;
     } else if (data.endsWith(GF("*PSNWID:"))) {
+      // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4e
       char dest[128];
-      streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
-//      streamSkipUntil('\n');  // Refresh network name by network
+      const bool valid = streamGetCharBefore('\n', dest, sizeof(dest)) != nullptr;
       data = "";
-      DBGLOG(Info, "\n\n{TinyGsmSim7080} Network name updated, *PSNWID: %s\n\n", dest)
+      if (valid) {
+        DBGLOG(Info, "\n\n{TinyGsmSim7080} Network name updated, *PSNWID: %s\n\n", dest)
+      } else {
+        DBGLOG(Warn, "{TinyGsmSim7080} Invalid or incomplete *PSNWID notification.")
+      }
       return true;
     } else if (data.endsWith(GF("*PSUTTZ:"))) {
+      // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4e
       char dest[32];
-      streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
-//      streamSkipUntil('\n');  // Refresh time and time zone by network
+      const bool valid = streamGetCharBefore('\n', dest, sizeof(dest)) != nullptr;
       data = "";
-      DBGLOG(Info, "\n\n{TinyGsmSim7080} Network time and time zone updated, *PSUTTZ: %s\n\n", dest)
+      if (valid) {
+        DBGLOG(Info, "\n\n{TinyGsmSim7080} Network time and time zone updated, *PSUTTZ: %s\n\n", dest)
+      } else {
+        DBGLOG(Warn, "{TinyGsmSim7080} Invalid or incomplete *PSUTTZ notification.")
+      }
       return true;
 //    } else if (data.endsWith(GF("+CTZV:"))) {
     } else if (data.endsWith(GF("CTZV:"))) {
+      // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4e
       char dest[32];
-      streamGetCharBefore('\n', dest, sizeof(dest));  // Refresh time zone by network
-//      streamSkipUntil('\n');  // Refresh network time zone by network
+      const bool valid = streamGetCharBefore('\n', dest, sizeof(dest)) != nullptr;
       data = "";
-      DBGLOG(Info, "\n\n{TinyGsmSim7080} Network time zone updated, +CTZV: %s\n\n", dest)
+      if (valid) {
+        DBGLOG(Info, "\n\n{TinyGsmSim7080} Network time zone updated, +CTZV: %s\n\n", dest)
+      } else {
+        DBGLOG(Warn, "{TinyGsmSim7080} Invalid or incomplete +CTZV notification.")
+      }
       return true;
     } else if (data.endsWith(GF("DST: "))) {
       int dst = streamGetIntegerBefore('\n');  // Refresh time zone by network

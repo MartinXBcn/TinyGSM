@@ -9,14 +9,14 @@
 #ifndef SRC_TINYGSMCOMMON_H_
 #define SRC_TINYGSMCOMMON_H_
 
-// The current library version number
+// The current version number of the original library
 #define TINYGSM_VERSION "0.12.0"
 
 
 
 // <MS>
 // To check in using program if correct version of forked library is used.
-#define MS_TINYGSMCLIENT_FORK_VERSION_INT 260111500
+#define MS_TINYGSMCLIENT_FORK_VERSION_INT 260111700
 
 
 // Logging

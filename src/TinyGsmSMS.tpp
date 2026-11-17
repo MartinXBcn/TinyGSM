@@ -10,6 +10,7 @@
 #define SRC_TINYGSMSMS_H_
 
 #include "TinyGsmCommon.h"
+#include <limits.h>
 
 #define TINY_GSM_MODEM_HAS_SMS
 
@@ -50,26 +51,53 @@ class TinyGsmSMS {
    * Utilities
    */
  protected:
+  // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4d
+  // Reject incomplete units and invalid nibbles before producing any output.
+  // size_t indices also avoid wrapping on responses longer than 255/65535 chars.
+  static inline int8_t TinyGsmHexCharToNibble(char c) {
+    if (c >= '0' && c <= '9') { return static_cast<int8_t>(c - '0'); }
+    if (c >= 'a' && c <= 'f') { return static_cast<int8_t>(c - 'a' + 10); }
+    if (c >= 'A' && c <= 'F') { return static_cast<int8_t>(c - 'A' + 10); }
+    return -1;
+  }
+
+  static inline bool TinyGsmIsValidHex(const String& instr, size_t unitChars) {
+    const size_t length = instr.length();
+    if (!unitChars || length % unitChars != 0) { return false; }
+    for (size_t i = 0; i < length; ++i) {
+      if (TinyGsmHexCharToNibble(instr[i]) < 0) { return false; }
+    }
+    return true;
+  }
+
+  // Used only after validating the complete input, so both nibbles exist.
+  static inline uint8_t TinyGsmHexByte(const String& instr, size_t offset) {
+    return static_cast<uint8_t>((TinyGsmHexCharToNibble(instr[offset]) << 4) |
+        TinyGsmHexCharToNibble(instr[offset + 1]));
+  }
+
   static inline String TinyGsmDecodeHex7bit(String& instr) {
     String result;
+    if (!TinyGsmIsValidHex(instr, 2)) { return result; }
+    const size_t bytes = instr.length() / 2;
+    if (!bytes) { return result; }
+    // Keep the existing packed-septet/padding behavior; no septet count is
+    // supplied by this API, so a final padding character cannot be inferred.
+    const size_t outputLength = bytes + bytes / 7;
+    if (!result.reserve(static_cast<unsigned int>(outputLength))) { return ""; }
     byte   reminder = 0;
     int8_t bitstate = 7;
-    for (uint8_t i = 0; i < instr.length(); i += 2) {
-      char buf[4] = {
-          0,
-      };
-      buf[0] = instr[i];
-      buf[1] = instr[i + 1];
-      byte b = strtol(buf, nullptr, 16);
+    for (size_t i = 0; i < instr.length(); i += 2) {
+      const byte b = TinyGsmHexByte(instr, i);
 
       byte bb = b << (7 - bitstate);
       char c  = (bb + reminder) & 0x7F;
-      result += c;
+      if (!result.concat(c)) { return ""; }
       reminder = b >> bitstate;
       bitstate--;
       if (bitstate == 0) {
         char cc = reminder;
-        result += cc;
+        if (!result.concat(cc)) { return ""; }
         reminder = 0;
         bitstate = 7;
       }
@@ -79,39 +107,45 @@ class TinyGsmSMS {
 
   static inline String TinyGsmDecodeHex8bit(String& instr) {
     String result;
-    for (uint16_t i = 0; i < instr.length(); i += 2) {
-      char buf[4] = {
-          0,
-      };
-      buf[0] = instr[i];
-      buf[1] = instr[i + 1];
-      char b = strtol(buf, nullptr, 16);
-      result += b;
+    if (!TinyGsmIsValidHex(instr, 2)) { return result; }
+    if (!instr.length()) { return result; }
+    if (!result.reserve(instr.length() / 2)) { return ""; }
+    for (size_t i = 0; i < instr.length(); i += 2) {
+      if (!result.concat(static_cast<char>(TinyGsmHexByte(instr, i)))) { return ""; }
     }
     return result;
   }
 
   static inline String TinyGsmDecodeHex16bit(String& instr) {
     String result;
-    for (uint16_t i = 0; i < instr.length(); i += 4) {
-      char buf[4] = {
-          0,
-      };
-      buf[0] = instr[i];
-      buf[1] = instr[i + 1];
-      char b = strtol(buf, nullptr, 16);
+    if (!TinyGsmIsValidHex(instr, 4)) { return result; }
+    if (!instr.length()) { return result; }
+    size_t outputLength = 0;
+    for (size_t i = 0; i < instr.length(); i += 4) {
+#if defined(TINY_GSM_UNICODE_TO_HEX)
+      const size_t needed = TinyGsmHexByte(instr, i) ? 6 : 1;
+#else
+      const size_t needed = 1;
+#endif
+      if (outputLength > UINT_MAX - needed) { return ""; }
+      outputLength += needed;
+    }
+    if (!result.reserve(static_cast<unsigned int>(outputLength))) { return ""; }
+    for (size_t i = 0; i < instr.length(); i += 4) {
+      const byte b = TinyGsmHexByte(instr, i);
       if (b) {  // If high byte is non-zero, we can't handle it ;(
 #if defined(TINY_GSM_UNICODE_TO_HEX)
-        result += "\\x";
-        result += instr.substring(i, i + 4);
+        if (!result.concat("\\x")) { return ""; }
+        for (size_t j = 0; j < 4; ++j) {
+          if (!result.concat(instr[i + j])) { return ""; }
+        }
 #else
-        result += "?";
+        if (!result.concat('?')) { return ""; }
 #endif
       } else {
-        buf[0] = instr[i + 2];
-        buf[1] = instr[i + 3];
-        b      = strtol(buf, nullptr, 16);
-        result += b;
+        if (!result.concat(static_cast<char>(TinyGsmHexByte(instr, i + 2)))) {
+          return "";
+        }
       }
     }
     return result;
@@ -141,7 +175,10 @@ class TinyGsmSMS {
     thisModem().stream.readStringUntil('"');
     String hex = thisModem().stream.readStringUntil('"');
     thisModem().stream.readStringUntil(',');
-    int8_t dcs = thisModem().streamGetIntBefore('\n');
+    // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4d
+    // Keep the parsed value wide until the DCS octet has been validated.
+    const int dcs = thisModem().streamGetIntBefore('\n');
+    if (dcs < 0 || dcs > 255) { return ""; }
 
     if (dcs == 15) {
       return TinyGsmDecodeHex8bit(hex);

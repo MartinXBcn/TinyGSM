@@ -476,39 +476,48 @@ end:
   **/
   bool getUserEquipmentSystemInfo(MsUserEquipmentSystemInfo& si) {
     bool ret = false;
+    // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4e
+    // Publish the new snapshot only after all bounded text fields and OK arrive.
+    MsUserEquipmentSystemInfo pending{};
+    bool responsePending = false;
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CPSI?"));
     if (thisModem().waitResponse(GF(AT_NL "+CPSI: ")) != 1) goto end;
-    thisModem().streamGetCharBefore(',', si.systemMode, sizeof(si.systemMode));
-    if (strcmp(si.systemMode, "GSM") == 0) { 
+    responsePending = true;
+    if (!thisModem().streamGetCharBefore(',', pending.systemMode, sizeof(pending.systemMode))) goto end;
+    if (strcmp(pending.systemMode, "GSM") == 0) {
       DBGLOG(Error, "[TinyGsmSim70xx] Only 'LTE' is supported, but 'GSM' was found!")
       goto end;
     }
-    if (strcmp(si.systemMode, "NO SERVICE") == 0) { 
+    if (strcmp(pending.systemMode, "NO SERVICE") == 0) {
       DBGLOG(Warn, "[TinyGsmSim70xx] 'NO SERVICE' was found!")
       goto end;
     }
     // Only read data concerning "LTE"
-    thisModem().streamGetCharBefore(',', si.operationMode, sizeof(si.operationMode));
-    thisModem().streamGetCharBefore(',', si.MCC_MNC, sizeof(si.MCC_MNC));
-    thisModem().streamGetCharBefore(',', si.TAC, sizeof(si.TAC));
-    thisModem().streamGetCharBefore(',', si.sCellID, sizeof(si.sCellID));
-    thisModem().streamGetCharBefore(',', si.pCellID, sizeof(si.pCellID));
-    thisModem().streamGetCharBefore(',', si.frequencyBand, sizeof(si.frequencyBand));
-    si.earfcn = thisModem().streamGetIntegerBefore(',');
-    si.dlbw = thisModem().streamGetIntegerBefore(',');
-    si.ulbw = thisModem().streamGetIntegerBefore(',');
-    si.RSRQ = thisModem().streamGetIntegerBefore(',');
-    si.RSRP = thisModem().streamGetIntegerBefore(',');
-    si.RSSI = thisModem().streamGetIntegerBefore(',');
-    si.RSSNR = thisModem().streamGetIntegerBefore('\n');
-    thisModem().waitResponse();
+    if (!thisModem().streamGetCharBefore(',', pending.operationMode, sizeof(pending.operationMode))) goto end;
+    if (!thisModem().streamGetCharBefore(',', pending.MCC_MNC, sizeof(pending.MCC_MNC))) goto end;
+    if (!thisModem().streamGetCharBefore(',', pending.TAC, sizeof(pending.TAC))) goto end;
+    if (!thisModem().streamGetCharBefore(',', pending.sCellID, sizeof(pending.sCellID))) goto end;
+    if (!thisModem().streamGetCharBefore(',', pending.pCellID, sizeof(pending.pCellID))) goto end;
+    if (!thisModem().streamGetCharBefore(',', pending.frequencyBand, sizeof(pending.frequencyBand))) goto end;
+    pending.earfcn = thisModem().streamGetIntegerBefore(',');
+    pending.dlbw = thisModem().streamGetIntegerBefore(',');
+    pending.ulbw = thisModem().streamGetIntegerBefore(',');
+    pending.RSRQ = thisModem().streamGetIntegerBefore(',');
+    pending.RSRP = thisModem().streamGetIntegerBefore(',');
+    pending.RSSI = thisModem().streamGetIntegerBefore(',');
+    pending.RSSNR = thisModem().streamGetIntegerBefore('\n');
+    ret = thisModem().waitResponse() == 1;
+    responsePending = false;
+    if (!ret) goto end;
 
+    si = pending;
     ret = true;
 
 end:
+    if (responsePending) thisModem().waitResponse();
     MS_TINY_GSM_SEM_GIVE_WAIT
     
     return ret;
@@ -521,21 +530,26 @@ end:
   // @note        
   **/
   bool getNetworkAPN(char* apn, size_t maxlen) {
+    // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 4e
+    if (!apn || maxlen == 0) { return false; }
     bool ret = false;
+    bool responsePending = false;
     apn[0] = 0;
 
     MS_TINY_GSM_SEM_TAKE_WAIT
 
     thisModem().sendAT(GF("+CGNAPN"));
     if (thisModem().waitResponse(GF(AT_NL "+CGNAPN: ")) != 1) goto end;
+    responsePending = true;
     if (thisModem().streamGetIntegerBefore(',') != 1) goto end;
-    thisModem().streamSkipUntil('"');
-    thisModem().streamGetCharBefore('"', apn, maxlen);
-    thisModem().waitResponse();
-
-    ret = true;
+    if (!thisModem().streamSkipUntil('"')) goto end;
+    if (!thisModem().streamGetCharBefore('"', apn, maxlen)) goto end;
+    ret = thisModem().waitResponse() == 1;
+    responsePending = false;
 
 end:
+    if (responsePending) thisModem().waitResponse();
+    if (!ret) apn[0] = '\0';
     MS_TINY_GSM_SEM_GIVE_WAIT
     
     return ret;
