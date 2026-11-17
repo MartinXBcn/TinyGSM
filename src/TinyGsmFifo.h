@@ -1,6 +1,11 @@
 #ifndef TinyGsmFifo_h
 #define TinyGsmFifo_h
 
+// 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 8
+// Declare size_t and memcpy without relying on the including header.
+#include <stddef.h>
+#include <string.h>
+
 template <class T, unsigned N>
 class TinyGsmFifo {
  public:
@@ -87,7 +92,9 @@ class TinyGsmFifo {
       int m = N - w;
       // check wrap
       if (f > m) f = m;
-      memcpy(&_b[w], p, f);
+      // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 8
+      // f counts elements, while memcpy expects a byte count.
+      memcpy(&_b[w], p, static_cast<size_t>(f) * sizeof(T));
       _w = _inc(w, f);
       c -= f;
       p += f;
@@ -134,7 +141,9 @@ class TinyGsmFifo {
       int m = static_cast<int>(N) - r;
       // check wrap
       if (f > m) f = m;
-      memcpy(p, &_b[r], static_cast<size_t>(f));
+      // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 8
+      // Copy complete elements when T occupies more than one byte.
+      memcpy(p, &_b[r], static_cast<size_t>(f) * sizeof(T));
       _r = _inc(r, f);
       c -= f;
       p += f;
@@ -142,7 +151,10 @@ class TinyGsmFifo {
     return n - c;
   }
 
-  uint8_t peek() {
+  // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 8
+  // Match the stream convention: -1 means empty; valid bytes include 0xFF.
+  int peek() {
+    if (!readable()) { return -1; }
     return _b[_r];
   }
 
@@ -159,9 +171,11 @@ class TinyGsmFifo {
     return static_cast<int>(static_cast<unsigned int>(i + n) % N);
   }
 
-  T   _b[N];  /// The buffer, containing 'N' items of type 'T'
-  int _w;     /// The write position in the buffer
-  int _r;     /// The read position in the buffer
+  // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 8
+  // Initialize storage and positions for deterministic receive-buffer state.
+  T   _b[N]{};  /// The buffer, containing 'N' items of type 'T'
+  int _w = 0;   /// The write position in the buffer
+  int _r = 0;   /// The read position in the buffer
 };
 
 #endif
