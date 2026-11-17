@@ -752,12 +752,13 @@ endxx:
     DBGLOG(Info, "[TinyGsmSim7080] setPhoneFunctionality(0) ...");
     if (!setPhoneFunctionality(0)) { 
       DBGLOG(Error, "[TinyGsmSim7080] Restart failed, setPhoneFunctionality(0) failed!")
+      // 17.11.2026 - Audit vs. TinyGSM 0.13.0-rc.1 - 9b
+      success = false;
       goto end; 
     }
-    DBGLOG(Info, "[TinyGsmSim7080] setPhoneFunctionality(1, true) ...");
-//    if (!setPhoneFunctionality(1, true)) { 
+    DBGLOG(Info, "[TinyGsmSim7080] setPhoneFunctionality(1) ...");
     if (!setPhoneFunctionality(1)) { 
-      DBGLOG(Error, "[TinyGsmSim7080] Restart failed, setPhoneFunctionality(1, true) failed!")
+      DBGLOG(Error, "[TinyGsmSim7080] Restart failed, setPhoneFunctionality(1) failed!")
       success = false;
       goto end; 
     }
